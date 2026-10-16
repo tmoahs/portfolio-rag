@@ -36,7 +36,8 @@ print(interaction.output_text)
 # 2. Embedding direct du texte généré plus haut
 result = genai_client.models.embed_content(
     model="gemini-embedding-2",
-    contents=interaction.output_text  # On réutilise la sortie ici
+    contents=interaction.output_text,
+    config={"task_type": "RETRIEVAL_DOCUMENT"} # On réutilise la sortie ici
 )
 
 # Accès au vecteur de nombres
@@ -48,19 +49,26 @@ print(f"3 premières valeurs : {vector[:3]}")
 
 # Test ChromaDB
 from pathlib import Path
+from src.rag.config import DATA_DIR
 import chromadb
 
 # 1. Remonter d'un cran au-dessus de scripts/ pour atteindre la racine du projet
 ROOT_DIR = Path(__file__).resolve().parent.parent
 
-# 2. Pointer vers le dossier data à la racine
-CHROMA_PATH = ROOT_DIR / "data"
-
 # 3. Initialiser le client persistant avec ce chemin
-chroma_client = chromadb.PersistentClient(path=str(CHROMA_PATH))
+chroma_client = chromadb.PersistentClient(path=str(DATA_DIR))
 
 # get_or_create_collection évite une erreur si la collection existe déjà lors des relances
-collection = chroma_client.get_or_create_collection(name="my_collection")
+collection = chroma_client.get_or_create_collection(
+    name="rag_collection",
+    configuration={"hnsw": {"space": "cosine"}}
+)
+
+# Vérifier la communication entre Gemini et ChromaDB
+
+collection.upsert(ids=['id1'], embeddings=[vector], documents=[interaction.output_text])
+results = collection.query(query_embeddings=[vector], n_results=1)
 
 print("Chroma_DB")
+print(results)
 print("Nombre de documents :", collection.count())
