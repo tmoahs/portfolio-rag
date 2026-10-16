@@ -1,6 +1,3 @@
-from google.genai._gaos.types.interactions import source, content
-from rag.config import CHUNK_SIZE
-
 # ----------------------------------------------------------------------------------------
 def split_by_markdown_headers(text: str):
     sections = []
@@ -80,7 +77,6 @@ def chunk_all_documents(documents, max_chunk_size=500):
                 content=section["content"],
                 max_chunk_size=max_chunk_size
             )
-            # .extend() ajoute tous les éléments d'une liste dans une autre liste
             all_chunks.extend(section_chunks)
 
     return all_chunks
