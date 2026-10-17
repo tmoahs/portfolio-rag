@@ -16,3 +16,7 @@ EMBEDDING_MODEL = "gemini-embedding-2"
 # Taille des chunks
 
 CHUNK_SIZE = 500
+
+# Top K
+
+TOP_K = 4
