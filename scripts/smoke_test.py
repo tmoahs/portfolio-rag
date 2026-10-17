@@ -60,7 +60,7 @@ chroma_client = chromadb.PersistentClient(path=str(DATA_DIR))
 
 # get_or_create_collection évite une erreur si la collection existe déjà lors des relances
 collection = chroma_client.get_or_create_collection(
-    name="rag_collection",
+    name="smoke_test",
     configuration={"hnsw": {"space": "cosine"}}
 )
 
