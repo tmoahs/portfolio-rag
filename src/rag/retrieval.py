@@ -4,7 +4,10 @@ from src.rag.vectorstore import get_collection
 from src.rag.vectorstore import query_collection
 
 def retrieve(query: str, top_k: int = TOP_K):
-    query_vector = embed_query(query)
+    search_query = query
+    if "thomas" not in query.lower() and "patout" not in query.lower():
+        search_query = f"{query} (Thomas Patout)"
+    query_vector = embed_query(search_query)
     collection = get_collection()
     results = query_collection(collection, query_vector, n_results=top_k)
 
