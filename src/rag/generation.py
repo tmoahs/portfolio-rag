@@ -6,6 +6,14 @@ from src.rag.config import DISTANCE_THRESHOLD
 from src.rag.config import MAX_OUTPUT_TOKENS
 from src.rag.config import LLM_MODEL
 from google import genai
+from google.genai.errors import APIError
+
+class GeminiQuotaError(Exception):
+    pass
+
+
+class GeminiServiceError(Exception):
+    pass
 
 def format_context(chunks: list[dict]) -> str:
     parts = []
@@ -37,13 +45,15 @@ def generate_answer(question: str, chunks: list[dict]) -> dict:
                 "system_instruction": SYSTEM_INSTRUCTION,
                 "temperature": TEMPERATURE,
                 "max_output_tokens": MAX_OUTPUT_TOKENS,
-            }
+            },
         )
         answer = response.text
         tokens = response.usage_metadata.total_token_count
     except Exception as e:
-        answer = f"Erreur lors de la génération de la réponse : {e}"
-        tokens = 0
+        err_msg = str(e).lower()
+        if "429" in err_msg or "quota" in err_msg or "resource_exhausted" in err_msg:
+            raise GeminiQuotaError("Quota API dépassé.")
+        raise GeminiServiceError(f"Erreur du service LLM : {e}")
 
     latency = time.time() - start_time
 
