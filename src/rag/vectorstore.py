@@ -1,5 +1,4 @@
 import chromadb
-from contourpy import chunk
 
 from src.rag.config import DATA_DIR
 

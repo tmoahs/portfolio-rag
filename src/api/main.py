@@ -15,6 +15,7 @@ from src.api.routes import router
 from src.rag.config import ALLOWED_ORIGINS
 from src.rag.generation import genai_client
 from src.rag.vectorstore import get_collection
+from src.api.db import close_db_pool, init_db_pool
 
 # Configuration des logs serveur
 logging.basicConfig(
@@ -27,12 +28,14 @@ logger = logging.getLogger("api")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Démarrage de l'API : initialisation Chroma et Gemini...")
+    logger.info("Démarrage de l'API : initialisation Chroma, Gemini et Postgres...")
     _ = get_collection()
     _ = genai_client
-    logger.info("Ressources RAG prêtes.")
+    await init_db_pool()
+    logger.info("Ressources RAG et Base de données prêtes.")
     yield
-    logger.info("Arrêt de l'API.")
+    logger.info("Arrêt de l'API : fermeture des connexions...")
+    await close_db_pool()
 
 
 app = FastAPI(

@@ -31,6 +31,9 @@ def answer_question(question: str) -> dict:
         "exchange_id": exchange_id,
         "answer": result["answer"],
         "sources": result["sources"],
+        "tokens": result["tokens"],
+        "latency": result["latency"],
+        "chunks": chunks,
     }
 
 

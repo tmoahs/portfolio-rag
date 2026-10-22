@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: portfolio-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-thomas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-12345}
+      POSTGRES_DB: ${POSTGRES_DB:-portfolio_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432" # Optionnel : pratique pour garder la connexion PyCharm active
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-thomas} -d ${POSTGRES_DB:-portfolio_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: portfolio-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-thomas}:${POSTGRES_PASSWORD:-12345}@postgres:5432/${POSTGRES_DB:-portfolio_db}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - chroma_data:/app/data
+      - ./knowledge:/app/knowledge:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  chroma_data:

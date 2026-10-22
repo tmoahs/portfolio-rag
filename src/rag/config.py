@@ -28,7 +28,7 @@ TEMPERATURE = 0.2
 MAX_OUTPUT_TOKENS = 1200
 DISTANCE_THRESHOLD = 0.40
 
-# --- Sécurité & API ---
+# Sécurité & API
 # Origines autorisées pour CORS (localhost pour le dev, adaptable via .env)
 
 ALLOWED_ORIGINS = os.getenv(
@@ -39,3 +39,6 @@ ALLOWED_ORIGINS = os.getenv(
 # Limites de requêtes par IP
 RATE_LIMIT_ASK = os.getenv("RATE_LIMIT_ASK", "10/minute")
 RATE_LIMIT_FEEDBACK = os.getenv("RATE_LIMIT_FEEDBACK", "20/minute")
+
+# Base de données
+DATABASE_URL = os.getenv("DATABASE_URL")

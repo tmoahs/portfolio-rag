@@ -1,45 +1,69 @@
+from unittest.mock import AsyncMock
 import pytest
 from fastapi.testclient import TestClient
+from unittest.mock import AsyncMock, MagicMock
+
+from src.api.db import get_db_connection
 from src.api.main import app
 
-client = TestClient(app)
+
+async def override_get_db_connection():
+    mock_conn = MagicMock()
+    mock_cursor = AsyncMock()
+
+    # Configure cursor() pour être un async context manager valide
+    mock_cursor.__aenter__.return_value = mock_cursor
+    mock_cursor.__aexit__.return_value = None
+
+    mock_conn.cursor.return_value = mock_cursor
+    yield mock_conn
+
+@pytest.fixture(autouse=True)
+def setup_db_override(monkeypatch):
+    async def fake_noop(*args, **kwargs):
+        pass
+
+    monkeypatch.setattr("src.api.main.init_db_pool", fake_noop)
+    monkeypatch.setattr("src.api.main.close_db_pool", fake_noop)
+    monkeypatch.setattr("src.api.routes.save_exchange", fake_noop)
+
+    app.dependency_overrides[get_db_connection] = override_get_db_connection
+    yield
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def client():
+    with TestClient(app) as c:
+        yield c
 
 
 # --- 1. Endpoint de santé ---
-def test_health_check():
+def test_health_check(client):
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["database"] == "connected"
 
 
-# --- 2. Validation des entrées (sans appeler le modèle) ---
-def test_ask_empty_question():
-    # Question vide ou de moins de 2 caractères
+# --- 2. Validation des entrées ---
+def test_ask_empty_question(client):
     response = client.post("/ask", json={"question": ""})
     assert response.status_code == 422
 
 
-def test_ask_question_too_long():
-    # Question dépassant 500 caractères
+def test_ask_question_too_long(client):
     long_question = "a" * 501
     response = client.post("/ask", json={"question": long_question})
     assert response.status_code == 422
 
 
-# --- 3. Question valide avec Mock (fausse fonction RAG) ---
-def test_ask_valid_question(monkeypatch):
-    fake_exchange_id = "test-uuid-1234"
+# --- 3. Question valide avec Mock ---
+def test_ask_valid_question(client, monkeypatch):
+    fake_exchange_id = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
 
     def mock_answer_question(question: str):
-        from src.rag.pipeline import EXCHANGES_STORE
-
-        EXCHANGES_STORE[fake_exchange_id] = {
-            "question": question,
-            "answer": "Ceci est une réponse simulée.",
-            "sources": ["profil.md"],
-            "tokens": 42,
-            "latency": 0.1,
-        }
         return {
             "exchange_id": fake_exchange_id,
             "answer": "Ceci est une réponse simulée.",
@@ -56,13 +80,17 @@ def test_ask_valid_question(monkeypatch):
     assert data["exchange_id"] == fake_exchange_id
     assert "answer" in data
     assert "sources" in data
-    # Vérifie que les données internes ne fuitent pas vers le client
     assert "tokens" not in data
     assert "latency" not in data
 
 
 # --- 4. Tests du Feedback ---
-def test_feedback_unknown_exchange_id():
+def test_feedback_unknown_exchange_id(client, monkeypatch):
+    async def mock_save_feedback_missing(exchange_id, rating, comment):
+        return False
+
+    monkeypatch.setattr("src.api.routes.save_feedback", mock_save_feedback_missing)
+
     response = client.post(
         "/feedback",
         json={"exchange_id": "identifiant-inexistant", "rating": "positive"},
@@ -74,16 +102,16 @@ def test_feedback_unknown_exchange_id():
     )
 
 
-def test_feedback_valid_exchange():
-    from src.rag.pipeline import EXCHANGES_STORE
+def test_feedback_valid_exchange(client, monkeypatch):
+    async def mock_save_feedback(exchange_id, rating, comment):
+        return True
 
-    valid_id = "uuid-de-test-valide"
-    EXCHANGES_STORE[valid_id] = {"question": "Q", "answer": "R"}
+    monkeypatch.setattr("src.api.routes.save_feedback", mock_save_feedback)
 
     response = client.post(
         "/feedback",
         json={
-            "exchange_id": valid_id,
+            "exchange_id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
             "rating": "positive",
             "comment": "Super réponse !",
         },
