@@ -36,3 +36,10 @@ CREATE TABLE IF NOT EXISTS feedbacks (
 CREATE INDEX IF NOT EXISTS idx_exchanges_created_at ON exchanges(created_at);
 CREATE INDEX IF NOT EXISTS idx_chunks_exchange_id ON retrieved_chunks(exchange_id);
 CREATE INDEX IF NOT EXISTS idx_feedbacks_exchange_id ON feedbacks(exchange_id);
+
+-- Préparation de la table PostgreSQL
+CREATE TABLE IF NOT EXISTS documents_state (
+    filename VARCHAR(255) PRIMARY KEY,
+    file_hash VARCHAR(64) NOT NULL,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

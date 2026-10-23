@@ -3,3 +3,7 @@ data/
 .venv/
 __pycache__/
 .idea/
+logs/
+staging/
+*.pyc
+config/

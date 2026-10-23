@@ -3,7 +3,7 @@ import chromadb
 from src.rag.config import DATA_DIR
 
 def get_collection():
-    chroma_client = chromadb.PersistentClient(path=str(DATA_DIR))
+    chroma_client = chromadb.HttpClient(host="chroma", port=8000)
     collection = chroma_client.get_or_create_collection(
         name="rag_collection",
         configuration={"hnsw": {"space": "cosine"}}
