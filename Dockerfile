@@ -14,6 +14,7 @@ RUN uv sync --frozen --no-install-project --no-dev
 COPY src/ ./src/
 COPY knowledge/ ./knowledge/
 COPY scripts/ ./scripts/
+COPY static/ ./static/
 
 RUN uv sync --frozen --no-dev
 

@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Assistant IA de Thomas Patout : posez vos questions sur son parcours, ses compétences et ses projets data. Réponses générées à partir de documents, avec sources.">
+  <title>Assistant IA — Thomas Patout · Data Science &amp; MLOps</title>
+
+  <!-- Évite le flash de thème clair au chargement. Le toggle complet est dans ui.js. -->
+  <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem('theme');
+        const theme = stored === 'light' || stored === 'dark'
+          ? stored
+          : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.dataset.theme = theme;
+      } catch (_) { /* localStorage indisponible : on garde le thème clair */ }
+    })();
+  </script>
+
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <!--
+    CONTRAT DOM / POINTS D'INJECTION JS
+    -----------------------------------
+    Formulaire        : #ask-form, #question-input, #submit-button
+    Compteur          : #char-counter, #char-current, #char-max, #char-limit-status
+    Exemples          : #example-chips [data-question]
+    Chargement        : #loading-state (retirer `hidden`, passer aria-busy à "true")
+    Erreur            : #error-box (retirer `hidden`, renseigner #error-title / #error-message)
+    Réponse           : #answer-section, #answer-heading, #answer-body
+    Métadonnées       : #answer-meta, #answer-duration, #answer-timestamp
+    Feedback          : #feedback-up, #feedback-down, #feedback-status
+    Sources           : #sources-section, #sources-list, #sources-count, #source-item-template
+    Thème             : #theme-toggle (géré dans ui.js)
+
+    États CSS utiles :
+      formulaire       -> #ask-form[aria-busy="true"], .is-loading sur le bouton
+      compteur         -> .is-near-limit / .is-over-limit sur #char-counter
+      erreur           -> .alert--error / .alert--warning sur #error-box
+      réponse          -> [hidden] pour masquer, .is-fresh pour l'animation d'apparition
+      sources          -> le sous-bloc se masque tout seul si #sources-list est vide
+  -->
+
+  <a class="skip-link" href="#main">Aller au contenu principal</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="#main" aria-label="TP, Thomas Patout, Data Science &amp; MLOps — retour en haut">
+        <span class="brand-mark" aria-hidden="true">TP</span>
+        <span class="brand-text">
+          <strong>Thomas Patout</strong>
+          <span>Data Science &amp; MLOps</span>
+        </span>
+      </a>
+
+      <button
+        id="theme-toggle"
+        class="theme-toggle"
+        type="button"
+        role="switch"
+        aria-checked="false"
+        aria-label="Thème sombre"
+        title="Activer le thème sombre"
+      >
+        <svg class="icon icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="4.2"></circle>
+          <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"></path>
+        </svg>
+        <svg class="icon icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20.5 14.2A8.7 8.7 0 0 1 9.8 3.5a8.7 8.7 0 1 0 10.7 10.7Z"></path>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="main" class="container" tabindex="-1">
+
+    <section class="hero" aria-labelledby="hero-title">
+      <p class="eyebrow">
+        <span class="pulse-dot" aria-hidden="true"></span>
+        Assistant IA · Profil de Thomas Patout
+      </p>
+      <h1 id="hero-title">
+        Posez vos questions,<br>
+        <em>obtenez l’essentiel.</em>
+      </h1>
+      <p class="hero-subtitle">
+        Un assistant qui répond à partir de mon parcours, de mes compétences et de mes projets.
+        Pensé pour les recruteurs pressés — chaque réponse cite ses sources.
+      </p>
+    </section>
+
+    <section class="search" aria-labelledby="search-title">
+      <h2 id="search-title" class="sr-only">Poser une question à l’assistant</h2>
+
+      <form id="ask-form" class="ask-form" novalidate>
+        <div class="field">
+          <label for="question-input" class="sr-only">Votre question sur le profil de Thomas</label>
+          <textarea
+            id="question-input"
+            name="question"
+            rows="3"
+            maxlength="500"
+            data-max-length="500"
+            placeholder="Ex. Quelles sont les compétences de Thomas en Python ?"
+            aria-describedby="char-counter input-hint"
+            autocomplete="off"
+            spellcheck="true"
+            required
+          ></textarea>
+        </div>
+
+        <div class="form-bar">
+          <p id="char-counter" class="char-counter">
+            <span id="char-current">0</span><span class="char-sep" aria-hidden="true">/</span><span id="char-max">500</span>
+            <span class="char-label">caractères</span>
+          </p>
+
+          <div class="form-actions">
+            <span id="input-hint" class="keyboard-hint">
+              <kbd>Ctrl</kbd><span aria-hidden="true">+</span><kbd>Entrée</kbd>
+            </span>
+
+            <button id="submit-button" class="btn btn-primary" type="submit">
+              <span class="btn-text btn-text--idle">Interroger l’assistant</span>
+              <span class="btn-text btn-text--loading">Recherche…</span>
+              <span class="spinner" aria-hidden="true"></span>
+              <svg class="btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14M13 6l6 6-6 6"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <!-- Zone d'annonce discrète pour les lecteurs d'écran (limite de caractères). -->
+      <p id="char-limit-status" class="sr-only" role="status" aria-live="polite"></p>
+
+      <div class="examples" aria-labelledby="examples-label">
+        <p id="examples-label" class="examples-label">Essayez une question :</p>
+        <ul id="example-chips" class="chip-list">
+          <li>
+            <button class="chip" type="button" data-question="Quelles sont les compétences de Thomas en Python ?">
+              Compétences en Python
+            </button>
+          </li>
+          <li>
+            <button class="chip" type="button" data-question="Quel est son projet le plus complet et qu’a-t-il déployé en production ?">
+              Projet le plus abouti
+            </button>
+          </li>
+          <li>
+            <button class="chip" type="button" data-question="Est-il disponible immédiatement et mobile géographiquement ?">
+              Disponibilité &amp; mobilité
+            </button>
+          </li>
+          <li>
+            <button class="chip" type="button" data-question="Quelle est son expérience en MLOps et en automatisation IA ?">
+              Expérience MLOps
+            </button>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!--
+      ÉTAT D'ERREUR
+      Ajoutez/retirez `hidden`. Variantes : .alert--error (défaut), .alert--warning, .alert--info.
+      Exemples de messages : service saturé (429), indisponible (503), question invalide (400).
+      `role="alert"` déclenche l'annonce immédiate ; ne le laissez pas vide et visible en même temps.
+    -->
+    <div id="error-box" class="alert alert--error" role="alert" hidden>
+      <span class="alert-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M12 8.5v4.2"></path>
+          <circle cx="12" cy="16.4" r="0.9" fill="currentColor" stroke="none"></circle>
+          <path d="M10.3 3.9 2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"></path>
+        </svg>
+      </span>
+      <div class="alert-content">
+        <p id="error-title" class="alert-title">Le service est momentanément indisponible</p>
+        <p id="error-message" class="alert-message">
+          Réessayez dans quelques instants. Si le problème persiste, vous pouvez me contacter directement depuis le pied de page.
+        </p>
+      </div>
+      <button id="error-retry" class="alert-action" type="button">Réessayer</button>
+    </div>
+
+    <!--
+      ÉTAT DE CHARGEMENT
+      Retirez `hidden` et laissez `aria-busy="true"` pendant la requête.
+      Remettez ensuite `hidden` et passez `aria-busy` à "false".
+    -->
+    <section
+      id="loading-state"
+      class="result-card loading-card"
+      aria-labelledby="loading-title"
+      aria-busy="true"
+      hidden
+    >
+      <div class="loading-head" role="status" aria-live="polite">
+        <span class="spinner spinner-lg" aria-hidden="true"></span>
+        <div>
+          <h2 id="loading-title" class="loading-title">Recherche dans les documents…</h2>
+          <p id="loading-message" class="loading-message">Analyse du profil, des compétences et des projets.</p>
+        </div>
+      </div>
+
+      <div class="skeleton" aria-hidden="true">
+        <span class="skeleton-line" style="width: 92%"></span>
+        <span class="skeleton-line" style="width: 100%"></span>
+        <span class="skeleton-line" style="width: 84%"></span>
+        <span class="skeleton-line skeleton-line--short" style="width: 58%"></span>
+      </div>
+    </section>
+
+    <!--
+      ZONE DE RÉPONSE — vide par défaut, remplie par votre JavaScript.
+      - Retirez `hidden` uniquement lorsqu'une réponse est prête ; remettez-le au chargement suivant.
+      - Remplacez le contenu de #answer-heading et #answer-body (texte échappé ou HTML assaini).
+      - Ajoutez `.is-fresh` pour rejouer l'animation d'apparition.
+      - Pour l'accessibilité : après rendu, déplacez le focus sur #answer-heading (tabindex="-1").
+      - Si vous injectez du Markdown, nettoyez-le (DOMPurify ou équivalent). N'utilisez pas innerHTML brut.
+    -->
+    <section
+      id="answer-section"
+      class="result-card answer-card"
+      aria-labelledby="answer-heading"
+      aria-busy="false"
+      hidden
+    >
+      <header class="result-header">
+        <div class="result-header-main">
+          <p class="result-kicker">
+            <span class="status-dot" aria-hidden="true"></span>
+            Réponse de l’assistant
+          </p>
+          <h2 id="answer-heading" class="answer-question" tabindex="-1"></h2>
+        </div>
+        <p id="answer-meta" class="result-meta" hidden>
+          <span id="answer-duration"></span>
+          <span class="meta-sep" aria-hidden="true">·</span>
+          <span id="answer-timestamp"></span>
+        </p>
+      </header>
+
+      <div id="answer-body" class="prose"></div>
+
+      <div class="feedback">
+        <p id="feedback-label" class="feedback-label">Cette réponse vous a-t-elle été utile ?</p>
+        <div class="feedback-buttons" role="group" aria-labelledby="feedback-label">
+          <button id="feedback-up" class="feedback-btn" type="button" aria-pressed="false">
+            <span class="feedback-emoji" aria-hidden="true">👍</span>
+            <span>Utile</span>
+          </button>
+          <button id="feedback-down" class="feedback-btn" type="button" aria-pressed="false">
+            <span class="feedback-emoji" aria-hidden="true">👎</span>
+            <span>Pas utile</span>
+          </button>
+        </div>
+        <p id="feedback-status" class="feedback-status" role="status" aria-live="polite"></p>
+      </div>
+
+      <section id="sources-section" class="sources" aria-labelledby="sources-heading">
+        <div class="sources-header">
+          <h3 id="sources-heading" class="sources-title">Sources</h3>
+          <span id="sources-count" class="sources-count"></span>
+        </div>
+
+        <!-- Laisser cette balise vide (sans espace ni retour à la ligne) pour que :empty fonctionne. -->
+        <ol id="sources-list" class="sources-list"></ol>
+
+        <!-- Gabarit d'une source : clonez ce <template>, remplissez les champs puis ajoutez-le à #sources-list. -->
+        <template id="source-item-template">
+          <li class="source-item">
+            <button class="source-link" type="button" aria-expanded="false" aria-controls="">
+              <span class="source-num" aria-hidden="true"></span>
+              <span class="source-body">
+                <span class="source-title"></span>
+                <span class="source-excerpt"></span>
+                <span class="source-file"></span>
+              </span>
+              <svg class="source-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m6 9 6 6 6-6"></path>
+              </svg>
+            </button>
+
+            <div class="source-detail" role="region" hidden>
+              <p class="source-detail-label">Extrait utilisé pour répondre</p>
+              <p class="source-detail-text"></p>
+            </div>
+          </li>
+        </template>
+      </section>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+
+      <aside class="disclaimer" role="note" aria-labelledby="disclaimer-title">
+        <span class="disclaimer-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 21s7-3.2 7-9V5.8L12 3 5 5.8V12c0 5.8 7 9 7 9Z"></path>
+            <path d="M12 8.5v3.8"></path>
+            <circle cx="12" cy="15.4" r="0.9" fill="currentColor" stroke="none"></circle>
+          </svg>
+        </span>
+        <div>
+          <h2 id="disclaimer-title">À garder en tête</h2>
+          <p>
+            Les réponses sont générées par une IA à partir de documents et peuvent contenir des erreurs.
+            Les questions sont enregistrées de manière anonyme pour améliorer le service.
+          </p>
+        </div>
+      </aside>
+
+      <div class="footer-bottom">
+        <p class="footer-note">
+          Profil de <strong>Thomas Patout</strong> · Data Scientist &amp; MLOps
+        </p>
+
+        <nav class="footer-links" aria-label="Liens de contact">
+          <a class="footer-link" href="https://www.linkedin.com/in/thomas-patout/" target="_blank" rel="noopener noreferrer">
+            LinkedIn
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M7 17 17 7M9 7h8v8"></path>
+            </svg>
+          </a>
+          <a class="footer-link" href="https://github.com/tmoahs" target="_blank" rel="noopener noreferrer">
+            GitHub
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M7 17 17 7M9 7h8v8"></path>
+            </svg>
+          </a>
+          <!-- Ajoutez ici un lien mailto:votre-adresse@domaine.fr si vous préférez l'e-mail. -->
+        </nav>
+      </div>
+
+    </div>
+  </footer>
+
+  <!-- JS minimaliste d'interface : thème, compteur, pilules, Ctrl+Entrée. Aucune logique API. -->
+  <script src="/static/ui.js"></script>
+</body>
+</html>

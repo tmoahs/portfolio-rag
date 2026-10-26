@@ -1,9 +1,12 @@
 import chromadb
+import os
+CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
+CHROMA_PORT = int(os.getenv("CHROMA_PORT", 8001))
 
 from src.rag.config import DATA_DIR
 
 def get_collection():
-    chroma_client = chromadb.HttpClient(host="chroma", port=8000)
+    chroma_client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
     collection = chroma_client.get_or_create_collection(
         name="rag_collection",
         configuration={"hnsw": {"space": "cosine"}}

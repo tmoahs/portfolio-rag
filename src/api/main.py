@@ -7,6 +7,8 @@ load_dotenv()
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -44,6 +46,14 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# 1. Fichiers CSS et JS
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# 2. Route principale qui renvoie le fichier HTML
+@app.get("/")
+async def read_index():
+    return FileResponse("static/index.html")
 
 # Configuration du Rate Limiter
 app.state.limiter = limiter

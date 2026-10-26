@@ -43,3 +43,30 @@ CREATE TABLE IF NOT EXISTS documents_state (
     file_hash VARCHAR(64) NOT NULL,
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+----------------------------------------------------------
+-- 1. Table des statistiques quotidiennes (Une ligne par jour)
+CREATE TABLE IF NOT EXISTS daily_stats (
+    stat_date DATE PRIMARY KEY,
+    total_questions INT DEFAULT 0,
+    median_latency NUMERIC(5,2),
+    p95_latency NUMERIC(5,2),
+    total_tokens INT DEFAULT 0,
+    negative_feedback_rate NUMERIC(5,2), -- Pourcentage
+    refusal_rate NUMERIC(5,2)            -- Pourcentage
+);
+
+-- 2. Table des questions à examiner (Lacunes, refus, mauvais retours)
+CREATE TABLE IF NOT EXISTS flagged_questions (
+    exchange_id VARCHAR(36) PRIMARY KEY,
+    question TEXT NOT NULL,
+    flag_reason VARCHAR(50) NOT NULL, -- Ex: 'FEEDBACK_NEGATIF', 'DISTANCE_ELEVEE', 'REFUS'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3. Table d'usage des chunks (Efficacité des sources)
+CREATE TABLE IF NOT EXISTS chunk_usage (
+    chunk_id VARCHAR(255) PRIMARY KEY,
+    retrieval_count INT DEFAULT 0,
+    last_retrieved_at TIMESTAMP
+);

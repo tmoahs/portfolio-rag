@@ -73,5 +73,6 @@ def generate_answer(question: str, chunks: list[dict]) -> dict:
         "answer": answer,
         "sources": sources,
         "latency": latency,
+        "chunks": chunks,
         "tokens": tokens
     }

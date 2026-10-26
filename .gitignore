@@ -7,3 +7,4 @@ logs/
 staging/
 *.pyc
 config/
+eval/results/
