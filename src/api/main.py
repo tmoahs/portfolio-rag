@@ -31,14 +31,19 @@ logger = logging.getLogger("api")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Démarrage de l'API : initialisation Chroma, Gemini et Postgres...")
-    _ = get_collection()
-    _ = genai_client
-    await init_db_pool()
-    logger.info("Ressources RAG et Base de données prêtes.")
+    try:
+        _ = get_collection()
+        _ = genai_client
+    except Exception as e:
+        logger.warning(f"Ressources RAG indisponibles au démarrage : {e}")
+    try:
+        await init_db_pool()
+    except Exception as e:
+        logger.warning(f"Pool Postgres indisponible au démarrage : {e}")
+    logger.info("Application prête.")
     yield
     logger.info("Arrêt de l'API : fermeture des connexions...")
     await close_db_pool()
-
 
 app = FastAPI(
     title="Portfolio RAG API",
