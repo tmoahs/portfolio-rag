@@ -31,6 +31,11 @@ if ! id -u "$DEPLOY_USER" >/dev/null 2>&1; then
 fi
 usermod -aG sudo "$DEPLOY_USER"
 
+# Mot de passe désactivé + connexion par clé : sudo sans mot de passe pour ce compte.
+echo "$DEPLOY_USER ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/90-$DEPLOY_USER"
+chmod 440 "/etc/sudoers.d/90-$DEPLOY_USER"
+visudo -cf "/etc/sudoers.d/90-$DEPLOY_USER" >/dev/null
+
 install -d -m 700 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "/home/$DEPLOY_USER/.ssh"
 printf '%s\n' "$PUBLIC_KEY" > "/home/$DEPLOY_USER/.ssh/authorized_keys"
 chown "$DEPLOY_USER:$DEPLOY_USER" "/home/$DEPLOY_USER/.ssh/authorized_keys"
@@ -51,7 +56,7 @@ systemctl reload ssh 2>/dev/null || systemctl reload sshd
 echo "==> 3/6 Mises à jour de sécurité automatiques"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y unattended-upgrades ufw fail2ban ca-certificates curl gnupg
+apt-get install -y unattended-upgrades ufw fail2ban git ca-certificates curl gnupg
 cat > /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
 APT::Periodic::Update-Package-Lists "1";
 APT::Periodic::Unattended-Upgrade "1";
@@ -64,6 +69,7 @@ ufw default allow outgoing
 ufw allow "$SSH_PORT"/tcp
 ufw allow 80/tcp
 ufw allow 443/tcp
+ufw allow 443/udp
 ufw --force enable
 
 echo "==> 5/6 Docker + Compose (dépôt officiel, versions figées par apt)"

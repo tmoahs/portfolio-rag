@@ -332,8 +332,9 @@ bash deploy/bootstrap-server.sh "ssh-ed25519 AAAA... contact@laptop"
 # 2. Dépôt + secrets (créés à la main, jamais commités) :
 git clone https://github.com/tmoahs/portfolio-rag.git /srv/portfolio-rag
 cd /srv/portfolio-rag
-cp .env.prod.example .env.prod && chmod 600 .env.prod
-python3 scripts/gen_secrets.py    # coller les valeurs dans .env.prod
+# Crée .env.prod (droits 600) avec des secrets générés ; demande la clé Gemini
+# en saisie masquée :
+python3 scripts/init_prod_env.py --domain tpatout.fr --email t.patout@proton.me
 
 # 3. Démarrage (base + API + Caddy ; Airflow n'est pas inclus) :
 docker compose --env-file .env.prod \
