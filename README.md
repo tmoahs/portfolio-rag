@@ -5,7 +5,7 @@
 
 [![CI](https://github.com/tmoahs/portfolio-rag/actions/workflows/ci.yml/badge.svg)](https://github.com/tmoahs/portfolio-rag/actions/workflows/ci.yml)
 
-**Démo :** _bientôt en ligne_ · **API :** `/docs` (Swagger) · **Contact :** [LinkedIn](https://www.linkedin.com/in/thomas-patout/)
+**Démo :** [https://tpatout.fr](https://tpatout.fr) · **Contact :** [LinkedIn](https://www.linkedin.com/in/thomas-patout/)
 
 <!-- Ajoute ici une capture d'écran ou un GIF (docs/screenshot.png) :
 ![Aperçu de l'assistant](docs/screenshot.png)
@@ -533,8 +533,9 @@ prises en route.
   aléatoirement, aucune IP stockée, page de confidentialité, purge planifiée.
 - Images épinglées, healthchecks, rotation des logs, sauvegarde Postgres et restauration
   testée, CI GitHub Actions.
-- La mise en ligne sur VPS est préparée et validée localement (config Compose de prod,
-  build Caddy, `caddy validate`) ; l'ouverture au public reste à faire.
+- Mise en ligne sur un VPS OVHcloud (2 vCPU / 4 Go) : **https://tpatout.fr**.
+  HTTPS automatique via Caddy, index reconstruit sur le serveur, seuls 80/443 exposés.
+  La documentation Swagger n'est volontairement pas exposée publiquement.
 
 ### Arbitrages techniques
 
@@ -570,8 +571,8 @@ prises en route.
 - **Pas d'authentification** : volontaire pour une démo publique, avec quotas.
 - **Prompts adversariaux** : le prompt système prévoit la résistance aux instructions
   cachées, mais il n'existe pas encore de campagne de tests automatisée sur ce point.
-- **Mise en ligne** : le runbook et la configuration de production sont prêts et
-  validés localement ; la démo publique n'est pas encore ouverte.
+- **Exploitation** : sauvegarde Postgres planifiée et supervision externe (UptimeRobot)
+  restent à brancher.
 
 ---
 
