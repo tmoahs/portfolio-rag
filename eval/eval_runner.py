@@ -14,7 +14,7 @@ EVAL_CONFIG = {
     "top_k": TOP_K,
     "model": LLM_MODEL,
     "temperature": 0.0,
-    "api_url": "http://127.0.0.1:8000/ask"
+    "api_url": "http://127.0.0.1:8000/api/ask"
 }
 
 CACHE_FILE = Path("eval/eval_cache.json")
@@ -84,7 +84,13 @@ def evaluate_generation(cases):
         else:
             start_time = time.time()
             try:
-                response = requests.post(EVAL_CONFIG["api_url"], json={"question": query})
+                response = requests.post(
+                    EVAL_CONFIG["api_url"],
+                    json={"question": query},
+                    # Mesure le vrai pipeline : le cache serveur renverrait une
+                    # réponse instantanée et fausserait latence + comparaisons.
+                    headers={"X-Bypass-Cache": "1"},
+                )
                 answer = response.json().get("answer", "")
                 latency = time.time() - start_time
 

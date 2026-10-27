@@ -1,0 +1,57 @@
+# ---------------------------------------------------------------------------
+# Surcharge de PRODUCTION.
+#   docker compose --env-file .env.prod \
+#     -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Seul Caddy publie des ports (80/443). Postgres, Chroma, Airflow et l'API
+# restent accessibles uniquement depuis les réseaux Docker.
+# ---------------------------------------------------------------------------
+services:
+  api:
+    environment:
+      ENVIRONMENT: production
+      ALLOWED_ORIGINS: https://${DOMAIN:?DOMAIN requis}
+      TRUST_PROXY: "1"
+
+  caddy:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.caddy
+    image: portfolio-rag-caddy:2.11.7
+    container_name: portfolio-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN requis}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL requis}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Le site vit dans /srv/static : les URLs /static/... et les pages / et
+      # /confidentialite sont servies par les règles du Caddyfile.
+      - ./static:/srv/static:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - edge
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 80 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    mem_limit: 256m
+
+volumes:
+  caddy_data:
+  caddy_config:

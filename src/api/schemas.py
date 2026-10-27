@@ -12,6 +12,19 @@ class QuestionRequest(BaseModel):
     )
 
 
+class SourceChunk(BaseModel):
+    """Extrait de document réellement envoyé au modèle (affiché en accordéon)."""
+
+    text: str = Field(..., description="Texte du chunk utilisé pour répondre")
+    source: str = Field(..., description="Fichier d'origine du chunk")
+    title: Optional[str] = Field(
+        default=None, description="Titre lisible du document source"
+    )
+    distance: Optional[float] = Field(
+        default=None, description="Distance cosinus avec la question (plus bas = plus proche)"
+    )
+
+
 class AnswerResponse(BaseModel):
     exchange_id: str = Field(
         ...,
@@ -24,6 +37,14 @@ class AnswerResponse(BaseModel):
     sources: list[str] = Field(
         ...,
         description="Liste des documents sources utilisés",
+    )
+    chunks: list[SourceChunk] = Field(
+        default_factory=list,
+        description="Extraits de documents utilisés, affichés en détail dans l'interface",
+    )
+    cached: bool = Field(
+        default=False,
+        description="Vrai si la réponse provient du cache (aucun appel au modèle)",
     )
 
 

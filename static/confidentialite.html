@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Politique de confidentialité de l'assistant IA de Thomas Patout : données enregistrées, durée de conservation, traitement par l'API Gemini.">
+  <meta name="robots" content="index, follow">
+  <title>Confidentialité — Assistant IA · Thomas Patout</title>
+
+  <script src="/static/theme-init.js"></script>
+
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <a class="skip-link" href="#main">Aller au contenu principal</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="/" aria-label="TP, Thomas Patout — retour à l'assistant">
+        <span class="brand-mark" aria-hidden="true">TP</span>
+        <span class="brand-text">
+          <strong>Thomas Patout</strong>
+        </span>
+      </a>
+
+      <button
+        id="theme-toggle"
+        class="theme-toggle"
+        type="button"
+        role="switch"
+        aria-checked="false"
+        aria-label="Thème sombre"
+        title="Activer le thème sombre"
+      >
+        <svg class="icon icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="4.2"></circle>
+          <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"></path>
+        </svg>
+        <svg class="icon icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20.5 14.2A8.7 8.7 0 0 1 9.8 3.5a8.7 8.7 0 1 0 10.7 10.7Z"></path>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="main" class="container legal-page" tabindex="-1">
+    <p class="result-kicker"><span class="status-dot" aria-hidden="true"></span> Confidentialité</p>
+    <h1>Quelles données sont enregistrées&nbsp;?</h1>
+
+    <div class="prose">
+      <p>
+        Cet assistant répond à des questions sur le parcours professionnel de Thomas Patout.
+        Pour améliorer la qualité du service, chaque échange est enregistré de façon minimale.
+      </p>
+
+      <h2>Ce qui est enregistré</h2>
+      <ul>
+        <li>la question posée et la réponse générée ;</li>
+        <li>les extraits de documents qui ont servi à répondre (titre, source) ;</li>
+        <li>des mesures techniques : durée de génération, nombre de tokens ;</li>
+        <li>votre retour « utile / pas utile » et, si vous en laissez un, votre commentaire.</li>
+      </ul>
+      <p>
+        <strong>Aucune adresse IP n'est enregistrée</strong>, ni en clair ni hachée, et aucun
+        compte utilisateur n'est nécessaire. Le seul stockage local du navigateur sert à
+        mémoriser votre choix de thème clair ou sombre.
+      </p>
+
+      <h2>Pourquoi</h2>
+      <p>
+        Ces données servent uniquement à mesurer la qualité des réponses, identifier les
+        questions sans réponse satisfaisante et améliorer les documents sources. Elles ne
+        sont ni revendues, ni utilisées à des fins publicitaires, ni exploitées pour du
+        profilage.
+      </p>
+
+      <h2>Traitement par un service d'IA</h2>
+      <p>
+        Pour générer une réponse, votre question et les extraits de documents pertinents
+        sont transmis à l'<strong>API Google Gemini</strong> (Google Ireland Limited), qui
+        agit comme sous-traitant technique. Ces contenus peuvent donc transiter par les
+        infrastructures de Google. Ne saisissez pas d'informations sensibles dans le champ
+        de question : il est prévu pour des questions professionnelles.
+      </p>
+      <p>
+        Les réponses déjà générées sont conservées dans un <strong>cache technique</strong>
+        (7 jours) pour éviter de solliciter à nouveau le modèle sur une question identique.
+        Ce cache est partagé entre visiteurs, ne contient aucune donnée personnelle et est
+        invalidé dès que les documents sources changent.
+      </p>
+
+      <h2>Durée de conservation</h2>
+      <p>
+        Les échanges et les retours sont conservés <strong>12 mois maximum</strong>, puis
+        supprimés automatiquement. Les documents sources (parcours, projets) restent en
+        ligne tant que le portfolio est publié.
+      </p>
+
+      <h2>Vos droits</h2>
+      <p>
+        Vous pouvez demander l'accès, la rectification ou l'effacement des données vous
+        concernant, ainsi que vous opposer à leur traitement. Comme aucun identifiant ne
+        relie un échange à une personne, précisez si possible la question posée et la date.
+        Contact&nbsp;: <a href="mailto:t.patout@proton.me">t.patout@proton.me</a> ou
+        <a href="https://www.linkedin.com/in/thomas-patout/" target="_blank" rel="noopener noreferrer">LinkedIn</a>.
+      </p>
+
+      <h2>Cookies et traceurs</h2>
+      <p>
+        Ce site ne dépose <strong>aucun cookie</strong>, n'utilise aucun outil de mesure
+        d'audience ni aucun traceur publicitaire. C'est pourquoi aucun bandeau de
+        consentement ne vous est présenté.
+      </p>
+
+      <h2>Sécurité</h2>
+      <p>
+        Le site est servi en HTTPS. Les bases de données et l'orchestrateur (Airflow) ne sont
+        pas accessibles depuis Internet. Les secrets d'exploitation ne sont ni versionnés ni
+        exposés au navigateur, et les messages d'erreur renvoyés à l'interface restent
+        génériques.
+      </p>
+
+      <hr>
+      <p class="legal-note">
+        Cette page décrit de bonne foi le fonctionnement du service ; elle ne constitue pas
+        un avis juridique. Pour une vérification de conformité au RGPD, consultez une source
+        officielle comme la
+        <a href="https://www.cnil.fr/" target="_blank" rel="noopener noreferrer">CNIL</a>.
+        Dernière mise à jour&nbsp;: octobre 2026.
+      </p>
+    </div>
+
+    <p class="legal-back">
+      <a class="footer-link" href="/">← Retour à l'assistant</a>
+    </p>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-bottom">
+      <p class="footer-note">Profil de <strong>Thomas Patout</strong> · Data Scientist &amp; MLOps</p>
+    </div>
+  </footer>
+
+  <script src="/static/ui.js"></script>
+</body>
+</html>

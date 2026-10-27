@@ -1,0 +1,75 @@
+# Reverse proxy de production : HTTPS automatique, en-têtes de sécurité,
+# limites de taille et de débit, et flux SSE non tamponné.
+{
+	email {$ACME_EMAIL}
+	admin off
+}
+
+{$DOMAIN} {
+	log {
+		output stdout
+		format json
+	}
+
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(), microphone=(), camera=()"
+		Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+		-Server
+	}
+
+	# API : même origine que le site -> plus de CORS.
+	handle /api/* {
+		request_body {
+			max_size 8KB
+		}
+
+		# Limitation de débit au niveau du proxy (30 requêtes/minute/IP).
+		rate_limit {
+			zone api {
+				key {remote_host}
+				events 30
+				window 1m
+			}
+		}
+
+		reverse_proxy api:8000 {
+			# Indispensable pour le streaming : on ne tamponne pas les réponses.
+			flush_interval -1
+			transport http {
+				read_timeout 120s
+				write_timeout 120s
+			}
+		}
+	}
+
+	# Site statique : les fichiers vivent dans /srv/static (volume monté).
+	# Les pages HTML sont servies via une réécriture vers ce dossier.
+	handle / {
+		rewrite * /static/index.html
+		root * /srv
+		file_server
+	}
+
+	handle /confidentialite {
+		rewrite * /static/confidentialite.html
+		root * /srv
+		file_server
+	}
+
+	handle /favicon.svg {
+		rewrite * /static/favicon.svg
+		root * /srv
+		file_server
+	}
+
+	handle {
+		root * /srv
+		file_server
+	}
+}

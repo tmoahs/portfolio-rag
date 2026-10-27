@@ -10,7 +10,9 @@ CREATE TABLE IF NOT EXISTS exchanges (
     model_name VARCHAR(100),
     top_distance FLOAT,
     model_called BOOLEAN NOT NULL DEFAULT TRUE,
-    config_version VARCHAR(50)
+    config_version VARCHAR(50),
+    -- Permet de séparer les échanges de test des vraies statistiques.
+    is_test BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- Création de la table des chunks récupérés par le retriever
@@ -70,3 +72,31 @@ CREATE TABLE IF NOT EXISTS chunk_usage (
     retrieval_count INT DEFAULT 0,
     last_retrieved_at TIMESTAMP
 );
+
+-- 4. Traçabilité des exécutions des DAGs (une ligne par run)
+CREATE TABLE IF NOT EXISTS pipeline_logs (
+    run_id VARCHAR PRIMARY KEY,
+    dag_id VARCHAR,
+    execution_date DATE,
+    status VARCHAR,
+    completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 5. Cache de réponses (exact + sémantique), versionné par corpus/modèles/prompt
+CREATE TABLE IF NOT EXISTS answer_cache (
+    id BIGSERIAL PRIMARY KEY,
+    cache_version VARCHAR(64) NOT NULL,
+    question_norm TEXT NOT NULL,
+    question_text TEXT NOT NULL,
+    embedding JSONB,
+    answer TEXT NOT NULL,
+    sources JSONB NOT NULL DEFAULT '[]',
+    chunks JSONB NOT NULL DEFAULT '[]',
+    hits INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_hit_at TIMESTAMPTZ,
+    UNIQUE (cache_version, question_norm)
+);
+
+CREATE INDEX IF NOT EXISTS idx_answer_cache_created_at ON answer_cache(created_at);
+

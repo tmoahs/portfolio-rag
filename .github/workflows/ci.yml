@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  tests:
+    name: Tests API
+    runs-on: ubuntu-latest
+    env:
+      GEMINI_API_KEY: dummy-key-for-tests
+      DATABASE_URL: postgresql://test:test@localhost:5432/test
+      CHROMA_HOST: localhost
+      CHROMA_PORT: "8001"
+      ENVIRONMENT: test
+      TRUST_PROXY: "0"
+      DAILY_QUESTION_LIMIT: "0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.13.6"
+          enable-cache: true
+
+      - name: Installer Python
+        run: uv python install 3.13
+
+      - name: Installer les dépendances
+        run: uv sync --frozen
+
+      - name: Lancer les tests
+        run: uv run pytest tests/test_api.py tests/test_cache.py tests/test_generation.py -q

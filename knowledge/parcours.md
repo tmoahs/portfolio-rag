@@ -29,3 +29,4 @@ Entre 2022 et 2023, j'étais inscrit en master de psychologie du travail à l'Un
 - 2024 – 2025 : formation de Data Scientist OpenClassrooms (titre RNCP Niveau 7), avec 9 projets de formation.
 - Novembre 2025 – aujourd'hui : Data Scientist freelance sur Upwork, sans mission réalisée à ce jour.
 - 2026 : projet personnel AI Cultural Events Curator.
+- 2026 : projet personnel Portfolio RAG, un assistant IA qui répond à des questions sur mon parcours à partir de mes propres documents.

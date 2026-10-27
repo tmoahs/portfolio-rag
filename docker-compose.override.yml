@@ -1,0 +1,41 @@
+# ---------------------------------------------------------------------------
+# Surcharge de DÉVELOPPEMENT (chargée automatiquement par `docker compose up`).
+# Les ports sont publiés sur 127.0.0.1 uniquement : rien n'est exposé au réseau.
+# ---------------------------------------------------------------------------
+services:
+  postgres:
+    # Docker n'active pas les ports publiés d'un conteneur présent uniquement
+    # sur un réseau interne : on ajoute "edge" en dev pour garder l'accès local.
+    networks:
+      - data
+      - edge
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  chroma:
+    networks:
+      - data
+      - edge
+    ports:
+      - "127.0.0.1:8001:8000"
+
+  api:
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      ENVIRONMENT: development
+      ALLOWED_ORIGINS: http://127.0.0.1:8000,http://localhost:8000
+      TRUST_PROXY: "0"
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./src:/app/src:ro
+      - ./static:/app/static:ro
+      - ./knowledge:/app/knowledge:ro
+
+  airflow-init:
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "true"
+
+  airflow-apiserver:
+    ports:
+      - "127.0.0.1:8080:8080"

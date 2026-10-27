@@ -14,10 +14,11 @@ from slowapi.errors import RateLimitExceeded
 
 from src.api.limiter import limiter
 from src.api.routes import router
-from src.rag.config import ALLOWED_ORIGINS
+from src.rag.config import ALLOWED_ORIGINS, STATIC_DIR
 from src.rag.generation import genai_client
 from src.rag.vectorstore import get_collection
 from src.api.db import close_db_pool, init_db_pool
+from src.rag.cache import init_cache
 
 # Configuration des logs serveur
 logging.basicConfig(
@@ -31,6 +32,10 @@ logger = logging.getLogger("api")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Démarrage de l'API : initialisation Chroma, Gemini et Postgres...")
+    # Le pré-chargement des ressources RAG / DB est un confort de dev : s'il échoue
+    # (Chroma ou Postgres non démarrés), on continue quand même pour que la partie
+    # statique (index.html, /docs) reste accessible. Les routes /ask et /health
+    # renverront alors une erreur explicite.
     try:
         _ = get_collection()
         _ = genai_client
@@ -40,10 +45,15 @@ async def lifespan(app: FastAPI):
         await init_db_pool()
     except Exception as e:
         logger.warning(f"Pool Postgres indisponible au démarrage : {e}")
+    try:
+        init_cache()
+    except Exception as e:
+        logger.warning(f"Cache de réponses indisponible : {e}")
     logger.info("Application prête.")
     yield
     logger.info("Arrêt de l'API : fermeture des connexions...")
     await close_db_pool()
+
 
 app = FastAPI(
     title="Portfolio RAG API",
@@ -53,12 +63,24 @@ app = FastAPI(
 )
 
 # 1. Fichiers CSS et JS
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # 2. Route principale qui renvoie le fichier HTML
-@app.get("/")
+@app.get("/", include_in_schema=False)
 async def read_index():
-    return FileResponse("static/index.html")
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+# Page de confidentialité (servie par Caddy en production, par l'API en dev).
+@app.get("/confidentialite", include_in_schema=False)
+async def read_privacy():
+    return FileResponse(STATIC_DIR / "confidentialite.html")
+
+
+# Sonde de vivacité : ne dépend ni de Postgres ni de Chroma.
+@app.get("/live", include_in_schema=False)
+async def live():
+    return {"status": "ok"}
 
 # Configuration du Rate Limiter
 app.state.limiter = limiter
@@ -86,5 +108,8 @@ async def log_requests(request: Request, call_next):
     return response
 
 
-# Inclusion des routes
-app.include_router(router)
+# Inclusion des routes.
+#   /api/*  : chemin public (site + reverse proxy, même origine).
+#   sans préfixe : conservé pour les scripts (smoke test, eval) et la compatibilité.
+app.include_router(router, prefix="/api")
+app.include_router(router, include_in_schema=False)

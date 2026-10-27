@@ -1,0 +1,10 @@
+# Caddy + plugin de limitation de débit (absent de l'image officielle).
+# Base et plugin sont épinglés : pas de `latest`.
+FROM caddy:2.11.7-builder AS builder
+
+RUN xcaddy build v2.11.7 \
+    --with github.com/mholt/caddy-ratelimit@v0.1.0
+
+FROM caddy:2.11.7
+
+COPY --from=builder /usr/bin/caddy /usr/bin/caddy

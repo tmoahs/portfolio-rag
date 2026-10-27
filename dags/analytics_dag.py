@@ -17,11 +17,16 @@ sql_compute_stats = """
             DATE_TRUNC('day', e.created_at)::DATE AS stat_date,
             COUNT(e.id) AS total_questions,
             SUM(e.token_count) AS total_tokens,
-            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY e.latency_seconds) AS median_latency,
-            PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY e.latency_seconds) AS p95_latency,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY e.latency_seconds)
+                FILTER (WHERE e.model_called) AS median_latency,
+            PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY e.latency_seconds)
+                FILTER (WHERE e.model_called) AS p95_latency,
             COUNT(e.id) FILTER (
                 WHERE e.response_text ILIKE '%ne dispose pas%'
                    OR e.response_text ILIKE '%ne peux pas%'
+                   OR e.response_text ILIKE '%ne peux donc pas%'
+                   OR e.response_text ILIKE '%je suis dédié%'
+                   OR e.response_text ILIKE '%hors de mon périmètre%'
             ) AS total_refusals,
             COUNT(f.exchange_id) FILTER (WHERE f.rating = -1) AS negative_feedbacks
         FROM exchanges e
@@ -69,12 +74,35 @@ sql_flag_questions = """
           OR e.top_distance > 0.40 
           OR e.response_text ILIKE '%ne dispose pas%' 
           OR e.response_text ILIKE '%ne peux pas%'
+          OR e.response_text ILIKE '%ne peux donc pas%'
+          OR e.response_text ILIKE '%je suis dédié%'
+          OR e.response_text ILIKE '%hors de mon périmètre%'
       )
     ON CONFLICT (exchange_id) DO UPDATE SET 
         flag_reason = EXCLUDED.flag_reason;
 """
 
-# 3. Traçabilité du run dans une table de logs
+# 3. Usage des chunks : quelles sources servent vraiment ?
+# Recalcul complet et idempotent (pas de double comptage si le DAG est relancé).
+sql_chunk_usage = """
+    CREATE TABLE IF NOT EXISTS chunk_usage (
+        chunk_id VARCHAR(255) PRIMARY KEY,
+        retrieval_count INT DEFAULT 0,
+        last_retrieved_at TIMESTAMP
+    );
+
+    INSERT INTO chunk_usage (chunk_id, retrieval_count, last_retrieved_at)
+    SELECT rc.chunk_id, COUNT(*)::INT, MAX(e.created_at)
+    FROM retrieved_chunks rc
+    JOIN exchanges e ON e.id = rc.exchange_id
+    WHERE e.is_test = FALSE
+    GROUP BY rc.chunk_id
+    ON CONFLICT (chunk_id) DO UPDATE SET
+        retrieval_count = EXCLUDED.retrieval_count,
+        last_retrieved_at = EXCLUDED.last_retrieved_at;
+"""
+
+# 4. Traçabilité du run dans une table de logs
 sql_log_run = """
     CREATE TABLE IF NOT EXISTS pipeline_logs (
         run_id VARCHAR PRIMARY KEY,
@@ -112,6 +140,12 @@ with DAG(
         sql=sql_flag_questions,
     )
 
+    compute_chunk_usage = SQLExecuteQueryOperator(
+        task_id='compute_chunk_usage',
+        conn_id='postgres_default',
+        sql=sql_chunk_usage,
+    )
+
     log_run = SQLExecuteQueryOperator(
         task_id='log_run',
         conn_id='postgres_default',
@@ -119,4 +153,4 @@ with DAG(
     )
 
     # Ordre d'exécution
-    compute_stats >> flag_questions >> log_run
+    compute_stats >> flag_questions >> compute_chunk_usage >> log_run

@@ -1,7 +1,5 @@
 # Présentation générale de Thomas Patout
 
-Cette section résume le profil professionnel de Thomas Patout pour toute personne souhaitant faire connaissance avec lui, en savoir plus sur lui ou obtenir une présentation générale de son parcours.
-
 ## Qui je suis
 
 Je m'appelle Thomas Patout. Je suis de nationalité française et je travaille dans la data science, avec une spécialisation en MLOps et en automatisation IA. J'ai suivi une formation de Data Scientist sanctionnée par un titre RNCP Niveau 7 (Bac+5). Mon parcours est atypique : je viens de la psychologie et je me suis réorienté vers la data.
@@ -16,11 +14,11 @@ J'ai travaillé comme traducteur freelance sur Upwork de 2020 à novembre 2025, 
 
 ## Ce que je sais faire
 
-Je maîtrise Python et SQL, ainsi que le Machine Learning supervisé et non supervisé, le NLP et la Computer Vision. J'ai utilisé ces compétences dans des projets de formation et dans un projet déployé en production. Je sais aussi construire un pipeline Big Data sur AWS avec PySpark, et automatiser des workflows IA avec n8n et des API de modèles de langage.
+Je maîtrise Python et SQL, ainsi que le Machine Learning supervisé et non supervisé, le NLP et la Computer Vision. J'ai utilisé ces compétences dans des projets de formation et dans un projet déployé en production. Je sais aussi construire un pipeline Big Data sur AWS avec PySpark, et automatiser des workflows IA avec n8n et des API de modèles de langage. Je sais également concevoir un système RAG complet, de l'ingestion des documents à l'évaluation des réponses.
 
 ## Mes projets les plus représentatifs
 
-Mon projet le plus complet est le scoring de crédit : un modèle LightGBM (AUC 0,79) optimisé sur un score métier, déployé via une API FastAPI conteneurisée avec Docker et CI/CD, avec un dashboard Streamlit, SHAP, MLflow et un monitoring Evidently AI. J'ai aussi réalisé l'AI Cultural Events Curator, un workflow n8n de bout en bout à coût nul, et un pipeline Big Data AgriTech sur AWS EMR et PySpark. Les autres projets couvrent la prédiction de consommation de bâtiments, la classification multimodale, la segmentation client, le few-shot learning, le cadrage de projet IA, la santé publique et l'analyse de systèmes éducatifs.
+Mon projet le plus complet est le scoring de crédit : un modèle LightGBM (AUC 0,79) optimisé sur un score métier, déployé via une API FastAPI conteneurisée avec Docker et CI/CD, avec un dashboard Streamlit, SHAP, MLflow et un monitoring Evidently AI. J'ai aussi réalisé l'AI Cultural Events Curator, un workflow n8n de bout en bout à coût nul, et un pipeline Big Data AgriTech sur AWS EMR et PySpark. J'ai également construit le Portfolio RAG, un assistant IA qui répond à des questions sur mon parcours à partir de mes propres documents, avec FastAPI, Chroma, Gemini, Postgres, Airflow et Docker. Les autres projets couvrent la prédiction de consommation de bâtiments, la classification multimodale, la segmentation client, le few-shot learning, le cadrage de projet IA, la santé publique et l'analyse de systèmes éducatifs.
 
 ## Ce que je recherche
 

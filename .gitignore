@@ -1,10 +1,21 @@
-data/
+# Secrets : jamais versionnés
 .env
-.venv/
-__pycache__/
-.idea/
+.env.*
+!.env.example
+!.env.prod.example
+*.pem
+*.key
+
+# Données et artefacts locaux
+data/
 logs/
 staging/
-*.pyc
-config/
+backups/
 eval/results/
+eval/eval_cache.json
+config/
+.idea/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/

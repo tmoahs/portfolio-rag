@@ -137,6 +137,9 @@
 
       // Notifie aussi votre logique métier (compteur, activation du bouton, etc.).
       input.dispatchEvent(new Event("input", { bubbles: true }));
+
+      // Envoi immédiat : plus besoin de recliquer sur le bouton.
+      if (input.form) input.form.requestSubmit();
     });
   });
 
@@ -155,36 +158,27 @@
 /* ---------------------------------------------------------------------- */
   /* Logique API & Feedback (Intégration finale)                            */
   /* ---------------------------------------------------------------------- */
-  const API_BASE_URL = window.location.origin;
+  const API_BASE_URL = "/api";
 
   const askFormApi = document.getElementById("ask-form");
   const inputField = document.getElementById("question-input");
   const submitBtn = document.getElementById("submit-button");
 
   const loadingState = document.getElementById("loading-state");
+  const loadingMessage = document.getElementById("loading-message");
+  const loadingDefaultMessage = loadingMessage ? loadingMessage.textContent : "";
+
   const answerSection = document.getElementById("answer-section");
   const answerHeading = document.getElementById("answer-heading");
   const answerBody = document.getElementById("answer-body");
-  const sourcesList = document.getElementById('sources-list');
-  const sourceTemplate = document.getElementById('source-item-template');
-  const sourcesCount = document.getElementById('sources-count');
+  const answerMeta = document.getElementById("answer-meta");
+  const answerDuration = document.getElementById("answer-duration");
+  const answerTimestamp = document.getElementById("answer-timestamp");
 
-  // Ouvre / referme l'extrait complet d'une source (accordéon accessible).
-  if (sourcesList) {
-    sourcesList.addEventListener('click', (event) => {
-      const trigger = event.target.closest('.source-link');
-      if (!trigger || !sourcesList.contains(trigger) || trigger.disabled) return;
-
-      const detailId = trigger.getAttribute('aria-controls');
-      const detail = detailId ? document.getElementById(detailId) : null;
-      if (!detail) return;
-
-      const isOpen = trigger.getAttribute('aria-expanded') === 'true';
-      trigger.setAttribute('aria-expanded', String(!isOpen));
-      trigger.closest('.source-item')?.classList.toggle('is-open', !isOpen);
-      detail.hidden = isOpen;
-    });
-  }
+  const sourcesSection = document.getElementById("sources-section");
+  const sourcesList = document.getElementById("sources-list");
+  const sourceTemplate = document.getElementById("source-item-template");
+  const sourcesCount = document.getElementById("sources-count");
 
   const errorBox = document.getElementById("error-box");
   const errorTitle = document.getElementById("error-title");
@@ -193,186 +187,407 @@
   const feedbackStatus = document.getElementById("feedback-status");
   const upBtn = document.getElementById("feedback-up");
   const downBtn = document.getElementById("feedback-down");
+
   let currentExchangeId = null;
+  let isBusy = false;
 
-  if (askFormApi) {
-    askFormApi.addEventListener('submit', async (e) => {
-        e.preventDefault();
+  /* --- Utilitaires d'affichage ------------------------------------------- */
 
-        const question = inputField.value.trim();
-        const maxLength = Number.parseInt(inputField.getAttribute("maxlength"), 10) || 500;
+  const setBusy = (busy) => {
+    isBusy = busy;
 
-        if (!question || question.length > maxLength) return;
+    if (submitBtn) {
+      submitBtn.classList.toggle("is-loading", busy);
+      submitBtn.disabled = busy;
+    }
 
-        // 1. Réinitialisation et affichage du chargement
-        errorBox.setAttribute('hidden', '');
-        answerSection.setAttribute('hidden', '');
-        feedbackStatus.textContent = '';
-        sourcesList.replaceChildren();
-        if (sourcesCount) sourcesCount.textContent = '';
-        currentExchangeId = null;
+    if (loadingState) {
+      loadingState.toggleAttribute("hidden", !busy);
+      loadingState.setAttribute("aria-busy", String(busy));
+    }
 
-        // Réinitialise le feedback de la réponse précédente.
-        if (upBtn) {
-            upBtn.disabled = false;
-            upBtn.setAttribute('aria-pressed', 'false');
+    if (busy && loadingMessage) {
+      loadingMessage.textContent = loadingDefaultMessage;
+    }
+
+    if (answerSection) answerSection.setAttribute("aria-busy", String(busy));
+  };
+
+  const resetResult = () => {
+    if (errorBox) errorBox.setAttribute("hidden", "");
+    if (answerSection) {
+      answerSection.setAttribute("hidden", "");
+      answerSection.classList.remove("is-fresh", "is-streaming");
+    }
+    if (answerBody) answerBody.replaceChildren();
+    if (sourcesList) sourcesList.replaceChildren();
+    if (sourcesCount) sourcesCount.textContent = "";
+    if (sourcesSection) sourcesSection.removeAttribute("hidden");
+    if (answerMeta) answerMeta.setAttribute("hidden", "");
+    if (feedbackStatus) feedbackStatus.textContent = "";
+    if (upBtn) {
+      upBtn.disabled = false;
+      upBtn.setAttribute("aria-pressed", "false");
+    }
+    if (downBtn) {
+      downBtn.disabled = false;
+      downBtn.setAttribute("aria-pressed", "false");
+    }
+    currentExchangeId = null;
+  };
+
+  const revealAnswer = () => {
+    if (!answerSection) return;
+    answerSection.removeAttribute("hidden");
+    answerSection.classList.remove("is-fresh");
+    void answerSection.offsetWidth; // force le rejeu de l'animation
+    answerSection.classList.add("is-fresh");
+  };
+
+  // Écrit le texte de la réponse (texte brut : pas d'innerHTML, donc pas de XSS).
+  const renderAnswer = (text, streaming) => {
+    if (!answerBody) return;
+
+    let target = answerBody.querySelector(".stream-text");
+    if (!target) {
+      target = document.createElement("p");
+      target.className = "stream-text";
+      answerBody.replaceChildren(target);
+    }
+
+    target.textContent = text;
+    if (answerSection) answerSection.classList.toggle("is-streaming", Boolean(streaming));
+  };
+
+  const showMeta = (latency, cached = false) => {
+    if (!answerMeta) return;
+    if (answerDuration) {
+      if (cached) {
+        answerDuration.textContent = "en cache";
+      } else {
+        answerDuration.textContent = Number.isFinite(latency)
+          ? `${latency.toFixed(1)} s`
+          : "";
+      }
+    }
+    if (answerTimestamp) {
+      answerTimestamp.textContent = new Date().toLocaleTimeString("fr-FR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+    answerMeta.removeAttribute("hidden");
+  };
+
+  const extractFileName = (value) => {
+    if (!value) return "";
+    if (typeof value === "string") return value.split(/[\\/]/).pop();
+    if (typeof value === "object") {
+      const nested =
+        value.source || value.file || value.filename || value.document ||
+        (value.metadata
+          ? value.metadata.source || value.metadata.file_name || value.metadata.filename
+          : "");
+      return extractFileName(nested);
+    }
+    return "";
+  };
+
+  // Les chunks sont préfixés d'un en-tête technique "[fichier.md > Titre]" :
+  // on le retire à l'affichage uniquement (l'API conserve le texte brut).
+  const stripChunkHeader = (text) =>
+    String(text || "").replace(/^\s*\[[^\]\n]{1,200}\]\s*/, "");
+
+  // L'API renvoie désormais des chunks typés { text, source, title, distance }.
+  const normaliseSources = (chunks, sources) => {
+    const chunkList = Array.isArray(chunks) ? chunks : [];
+    const sourceList = Array.isArray(sources) ? sources : [];
+
+    if (chunkList.length) {
+      return chunkList.map((chunk, index) => {
+        const value = chunk && typeof chunk === "object" ? chunk : {};
+        const fileName =
+          extractFileName(value.source) ||
+          extractFileName(sourceList[index]) ||
+          `Source ${index + 1}`;
+
+        return {
+          fileName,
+          title: value.title || fileName,
+          text: stripChunkHeader(value.text || value.content || ""),
+        };
+      });
+    }
+
+    return sourceList.map((source, index) => {
+      const fileName = extractFileName(source) || `Source ${index + 1}`;
+      return { fileName, title: fileName, text: "" };
+    });
+  };
+
+  const renderSources = (chunks, sources) => {
+    if (!sourcesList || !sourceTemplate) return;
+
+    const entries = normaliseSources(chunks, sources);
+    sourcesList.replaceChildren();
+
+    if (sourcesCount) {
+      sourcesCount.textContent = entries.length
+        ? `${entries.length} source${entries.length > 1 ? "s" : ""}`
+        : "";
+    }
+
+    if (!entries.length) {
+      if (sourcesSection) sourcesSection.setAttribute("hidden", "");
+      return;
+    }
+
+    if (sourcesSection) sourcesSection.removeAttribute("hidden");
+
+    const fragment = document.createDocumentFragment();
+
+    entries.forEach((source, index) => {
+      const clone = sourceTemplate.content.cloneNode(true);
+      const { fileName, title, text } = source;
+
+      clone.querySelector(".source-num").textContent = String(index + 1).padStart(2, "0");
+
+      const trigger = clone.querySelector(".source-link");
+      const detail = clone.querySelector(".source-detail");
+      const detailId = `source-detail-${index}`;
+      const titleEl = clone.querySelector(".source-title");
+      const excerpt = clone.querySelector(".source-excerpt");
+      const fileEl = clone.querySelector(".source-file");
+
+      titleEl.id = `${detailId}-title`;
+      titleEl.textContent = title;
+
+      // Évite de répéter le nom du fichier quand il sert déjà de titre.
+      if (fileEl) {
+        if (fileName && fileName !== title) {
+          fileEl.textContent = fileName;
+        } else {
+          fileEl.remove();
         }
-        if (downBtn) {
-            downBtn.disabled = false;
-            downBtn.setAttribute('aria-pressed', 'false');
-        }
+      }
 
-        submitBtn.classList.add('is-loading');
-        submitBtn.disabled = true;
-        loadingState.removeAttribute('hidden');
-        loadingState.setAttribute('aria-busy', 'true');
+      detail.id = detailId;
+      detail.setAttribute("aria-labelledby", titleEl.id);
+      trigger.setAttribute("aria-controls", detailId);
+      trigger.dataset.doc = fileName;
+
+      if (text) {
+        // L'aperçu est tronqué en CSS ; le panneau affiche le texte complet du chunk.
+        excerpt.textContent = text;
+        detail.querySelector(".source-detail-text").textContent = text;
+      } else {
+        excerpt.remove();
+        detail.remove();
+        trigger.disabled = true;
+        trigger.removeAttribute("aria-controls");
+        trigger.removeAttribute("aria-expanded");
+        clone.querySelector(".source-chevron")?.remove();
+      }
+
+      fragment.appendChild(clone);
+    });
+
+    sourcesList.appendChild(fragment);
+  };
+
+  // Ouvre / referme l'extrait complet d'une source (accordéon accessible).
+  if (sourcesList) {
+    sourcesList.addEventListener("click", (event) => {
+      const trigger = event.target.closest(".source-link");
+      if (!trigger || !sourcesList.contains(trigger) || trigger.disabled) return;
+
+      const detailId = trigger.getAttribute("aria-controls");
+      const detail = detailId ? document.getElementById(detailId) : null;
+      if (!detail) return;
+
+      const isOpen = trigger.getAttribute("aria-expanded") === "true";
+      trigger.setAttribute("aria-expanded", String(!isOpen));
+      trigger.closest(".source-item")?.classList.toggle("is-open", !isOpen);
+      detail.hidden = isOpen;
+    });
+  }
+
+  /* --- Lecture du flux SSE ----------------------------------------------- */
+
+  const readSseStream = async (response, onEvent) => {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      const separator = /\r?\n\r?\n/g;
+      let match;
+      let consumed = 0;
+
+      while ((match = separator.exec(buffer)) !== null) {
+        const block = buffer.slice(consumed, match.index);
+        consumed = match.index + match[0].length;
+
+        const dataLine = block.split(/\r?\n/).find((line) => line.startsWith("data:"));
+        if (!dataLine) continue;
+
+        const raw = dataLine.slice(5).trim();
+        if (!raw) continue;
 
         try {
-            const response = await fetch(`${API_BASE_URL}/ask`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ question: question })
-            });
-
-            if (!response.ok) {
-                await handleError(response.status);
-                return;
-            }
-
-            const data = await response.json();
-
-            // 2. Remplissage sécurisé des données
-            if (answerBody) answerBody.textContent = data.answer;
-            if (answerHeading) answerHeading.textContent = question;
-            currentExchangeId = data.exchange_id;
-
-        // Sources
-        // L'API renvoie "sources" (documents) et "chunks" (extraits) : on combine les deux.
-        const rawChunks = Array.isArray(data.chunks) ? data.chunks : [];
-        const rawSources = Array.isArray(data.sources) ? data.sources : [];
-
-        const extractFileName = (value) => {
-            if (!value) return "";
-            if (typeof value === "string") return value.split(/[\\/]/).pop();
-            if (typeof value === "object") {
-                const nested = value.source || value.file || value.filename || value.document ||
-                    (value.metadata ? (value.metadata.source || value.metadata.file_name || value.metadata.filename) : "");
-                return extractFileName(nested);
-            }
-            return "";
-        };
-
-        const sourceEntries = rawChunks.length
-            ? rawChunks.map((chunk, index) => {
-                const isString = typeof chunk === "string";
-                const metadata = !isString && chunk.metadata ? chunk.metadata : {};
-                const paired = rawSources[index];
-                const pairedName = extractFileName(paired);
-
-                if (isString) {
-                    const trimmed = chunk.trim();
-                    // Un chunk texte contient souvent des espaces ; un simple nom de fichier n'en a pas.
-                    const looksLikeFileName = !/\s/.test(trimmed) && /\.[a-z0-9]{2,5}$/i.test(trimmed);
-                    return {
-                        fileName: pairedName || (looksLikeFileName ? extractFileName(trimmed) : "") || `Source ${index + 1}`,
-                        title: pairedName || (looksLikeFileName ? extractFileName(trimmed) : "") || `Source ${index + 1}`,
-                        textContent: looksLikeFileName && !pairedName ? "" : chunk
-                    };
-                }
-
-                const fileName = extractFileName(chunk) || pairedName || `Source ${index + 1}`;
-                const title = chunk.title || metadata.title || fileName;
-                const pairedText = paired && typeof paired === "object"
-                    ? (paired.text || paired.content || paired.page_content || paired.excerpt)
-                    : "";
-                const textContent = chunk.text || chunk.content || chunk.page_content || chunk.excerpt || pairedText || "";
-                return { fileName, title, textContent };
-            })
-            : rawSources.map((source, index) => {
-                const isString = typeof source === "string";
-                const metadata = !isString && source.metadata ? source.metadata : {};
-                const fileName = extractFileName(source) || `Source ${index + 1}`;
-                const title = (!isString && (source.title || metadata.title)) || fileName;
-                const textContent = isString
-                    ? ""
-                    : source.text || source.content || source.page_content || source.excerpt || "";
-                return { fileName, title, textContent };
-            });
-
-        if (sourceEntries.length > 0 && sourcesList && sourceTemplate) {
-            if (sourcesCount) {
-                sourcesCount.textContent = `${sourceEntries.length} source${sourceEntries.length > 1 ? "s" : ""}`;
-            }
-
-            const fragment = document.createDocumentFragment();
-
-            sourceEntries.forEach((source, index) => {
-                const clone = sourceTemplate.content.cloneNode(true);
-                const { fileName, title, textContent } = source;
-
-                clone.querySelector('.source-num').textContent = String(index + 1).padStart(2, '0');
-
-                const trigger = clone.querySelector('.source-link');
-                const detail = clone.querySelector('.source-detail');
-                const detailId = `source-detail-${index}`;
-                const titleEl = clone.querySelector('.source-title');
-                const excerpt = clone.querySelector('.source-excerpt');
-                const fileEl = clone.querySelector('.source-file');
-
-                titleEl.id = `${detailId}-title`;
-                titleEl.textContent = title;
-
-                // Évite de répéter le nom du fichier quand il sert déjà de titre.
-                if (fileEl) {
-                    if (fileName && fileName !== title) {
-                        fileEl.textContent = fileName;
-                    } else {
-                        fileEl.remove();
-                    }
-                }
-
-                detail.id = detailId;
-                detail.setAttribute('aria-labelledby', titleEl.id);
-                trigger.setAttribute('aria-controls', detailId);
-                trigger.dataset.doc = fileName;
-
-                if (textContent) {
-                    // L'aperçu est tronqué en CSS ; le panneau affiche le texte complet.
-                    excerpt.textContent = textContent;
-                    detail.querySelector('.source-detail-text').textContent = textContent;
-                } else {
-                    excerpt.remove();
-                    detail.remove();
-                    trigger.disabled = true;
-                    trigger.removeAttribute('aria-controls');
-                    trigger.removeAttribute('aria-expanded');
-                    clone.querySelector('.source-chevron')?.remove();
-                }
-
-                fragment.appendChild(clone);
-            });
-
-            sourcesList.appendChild(fragment);
-        }
-
-            // 3. Affichage de la réponse
-            loadingState.setAttribute('hidden', '');
-            loadingState.setAttribute('aria-busy', 'false');
-            answerSection.removeAttribute('hidden');
-            answerSection.classList.remove('is-fresh');
-            void answerSection.offsetWidth; // force le rejeu de l'animation
-            answerSection.classList.add('is-fresh');
-            if (answerHeading) answerHeading.focus();
-
+          onEvent(JSON.parse(raw));
         } catch (error) {
-            console.error("Erreur lors de la requête :", error);
-            loadingState.setAttribute('hidden', '');
-            loadingState.setAttribute('aria-busy', 'false');
-            showError("Erreur de connexion", "Impossible de contacter le serveur. Veuillez réessayer plus tard.");
-        } finally {
-            submitBtn.classList.remove('is-loading');
-            submitBtn.disabled = false;
+          console.warn("Événement SSE illisible :", raw, error);
         }
+      }
+
+      buffer = buffer.slice(consumed);
+    }
+  };
+
+  /* --- Appels API -------------------------------------------------------- */
+
+  const askClassic = async (question) => {
+    const response = await fetch(`${API_BASE_URL}/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+
+    if (!response.ok) {
+      await handleError(response.status);
+      return;
+    }
+
+    const data = await response.json();
+
+    currentExchangeId = data.exchange_id || null;
+    if (answerHeading) answerHeading.textContent = question;
+    renderAnswer(data.answer || "", false);
+    renderSources(data.chunks, data.sources);
+    showMeta(Number.NaN, Boolean(data.cached));
+    revealAnswer();
+    if (loadingState) loadingState.setAttribute("hidden", "");
+  };
+
+  const askStream = async (question) => {
+    const response = await fetch(`${API_BASE_URL}/ask/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+      body: JSON.stringify({ question }),
+    });
+
+    // Backend pas encore à jour : on retombe sur le POST classique.
+    if (response.status === 404 || response.status === 405) return false;
+
+    if (!response.ok) {
+      await handleError(response.status);
+      return true;
+    }
+
+    if (!response.body) return false;
+
+    let answer = "";
+    let started = false;
+    let completed = false;
+    let streamError = null;
+
+    const startStreamingUi = () => {
+      if (started) return;
+      started = true;
+      revealAnswer();
+      if (loadingState) loadingState.setAttribute("hidden", "");
+    };
+
+    await readSseStream(response, (event) => {
+      if (!event || typeof event.type !== "string") return;
+
+      switch (event.type) {
+        case "meta":
+          currentExchangeId = event.exchange_id || null;
+          break;
+
+        case "sources":
+          renderSources(event.chunks, null);
+          if (loadingMessage) loadingMessage.textContent = "Rédaction de la réponse…";
+          break;
+
+        case "delta":
+          startStreamingUi();
+          answer += event.text || "";
+          renderAnswer(answer, true);
+          break;
+
+        case "done":
+          completed = true;
+          currentExchangeId = event.exchange_id || currentExchangeId;
+          answer = event.answer || answer;
+          renderAnswer(answer, false);
+          if (sourcesSection && Array.isArray(event.sources) && !event.sources.length) {
+            sourcesSection.setAttribute("hidden", "");
+          }
+          showMeta(Number(event.latency), Boolean(event.cached));
+          startStreamingUi();
+          if (loadingState) loadingState.setAttribute("hidden", "");
+          if (answerHeading) answerHeading.focus();
+          break;
+
+        case "error":
+          streamError = event.message || "Le service est momentanément indisponible.";
+          if (loadingState) loadingState.setAttribute("hidden", "");
+          showError("Service indisponible", streamError);
+          break;
+
+        default:
+          break;
+      }
+    });
+
+    if (!completed && !streamError && answer) {
+      showError(
+        "Réponse incomplète",
+        "La réponse s'est interrompue avant la fin. Vous pouvez réessayer."
+      );
+    }
+
+    return true;
+  };
+
+  if (askFormApi) {
+    askFormApi.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (isBusy) return;
+
+      const question = inputField ? inputField.value.trim() : "";
+      const maxLength = inputField
+        ? Number.parseInt(inputField.getAttribute("maxlength"), 10) || 500
+        : 500;
+
+      if (!question || question.length > maxLength) return;
+
+      resetResult();
+      setBusy(true);
+      if (answerHeading) answerHeading.textContent = question;
+
+      try {
+        const handled = await askStream(question);
+        if (!handled) await askClassic(question);
+      } catch (error) {
+        console.error("Erreur lors de la requête :", error);
+        if (loadingState) loadingState.setAttribute("hidden", "");
+        showError(
+          "Erreur de connexion",
+          "Impossible de contacter le serveur. Veuillez réessayer plus tard."
+        );
+      } finally {
+        setBusy(false);
+        if (answerSection) answerSection.classList.remove("is-streaming");
+      }
     });
   }
 
@@ -431,6 +646,81 @@
       } catch (error) {
           console.error("Erreur réseau pour le feedback :", error);
       }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Contact : copie de l'adresse email                                     */
+  /* ---------------------------------------------------------------------- */
+  const contactLink = document.getElementById("contact-link");
+  const contactTooltip = document.getElementById("contact-tooltip");
+
+  if (contactLink && contactTooltip) {
+    const EMAIL = "t.patout@proton.me";
+    let tooltipTimer = null;
+
+    const hideTooltip = () => {
+      contactTooltip.classList.remove("is-visible");
+      if (tooltipTimer) {
+        clearTimeout(tooltipTimer);
+        tooltipTimer = null;
+      }
+    };
+
+    const showTooltip = () => {
+      // Le texte est injecté au clic : la région aria-live est ainsi annoncée.
+      contactTooltip.textContent = `Email copié : ${EMAIL}`;
+      contactTooltip.classList.add("is-visible");
+      if (tooltipTimer) clearTimeout(tooltipTimer);
+      tooltipTimer = setTimeout(hideTooltip, 2600);
+    };
+
+    const copyWithFallback = () => {
+      const area = document.createElement("textarea");
+      area.value = EMAIL;
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.appendChild(area);
+      area.select();
+      let copied = false;
+      try {
+        copied = document.execCommand("copy");
+      } catch (_) {
+        copied = false;
+      }
+      area.remove();
+      return copied;
+    };
+
+    contactLink.addEventListener("click", async (event) => {
+      // Pas d'API presse-papiers (http non sécurisé) : on laisse le mailto agir.
+      if (!navigator.clipboard && !document.queryCommandSupported?.("copy")) return;
+
+      event.preventDefault();
+
+      let copied = false;
+      try {
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText(EMAIL);
+          copied = true;
+        } else {
+          copied = copyWithFallback();
+        }
+      } catch (_) {
+        copied = copyWithFallback();
+      }
+
+      if (copied) {
+        showTooltip();
+      } else {
+        // Dernier recours : comportement mailto classique.
+        window.location.href = contactLink.getAttribute("href");
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") hideTooltip();
+    });
   }
 
 })(); // Fin de la fonction IIFE globale

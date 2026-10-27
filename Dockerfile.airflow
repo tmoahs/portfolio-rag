@@ -1,5 +1,15 @@
+# Airflow sert à la démonstration et à l'ingestion hors ligne.
+# Il n'est PAS déployé en production (profil Compose "airflow" absent côté serveur).
 FROM apache/airflow:3.3.2-python3.13
 
 USER airflow
 
-RUN pip install --no-cache-dir chromadb google-genai "psycopg[binary,pool]" python-dotenv
+# Dépendances épinglées : mêmes versions que l'API (voir uv.lock).
+RUN pip install --no-cache-dir \
+    "chromadb==1.5.9" \
+    "google-genai==2.31.0" \
+    "psycopg[binary,pool]>=3.3.6" \
+    "python-dotenv>=1.2.4"
+
+# Les DAGs importent src.rag : le code est embarqué dans l'image.
+COPY --chown=airflow:root src/ /opt/airflow/src/

@@ -4,20 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Assistant IA de Thomas Patout : posez vos questions sur son parcours, ses compétences et ses projets data. Réponses générées à partir de documents, avec sources.">
-  <title>Assistant IA — Thomas Patout · Data Science &amp; MLOps</title>
+  <title>Assistant IA — Thomas Patout</title>
 
-  <!-- Évite le flash de thème clair au chargement. Le toggle complet est dans ui.js. -->
-  <script>
-    (() => {
-      try {
-        const stored = localStorage.getItem('theme');
-        const theme = stored === 'light' || stored === 'dark'
-          ? stored
-          : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        document.documentElement.dataset.theme = theme;
-      } catch (_) { /* localStorage indisponible : on garde le thème clair */ }
-    })();
-  </script>
+  <!-- Évite le flash de thème clair au chargement (fichier externe : CSP stricte). -->
+  <script src="/static/theme-init.js"></script>
 
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/style.css">
@@ -50,11 +40,10 @@
 
   <header class="site-header">
     <div class="container header-inner">
-      <a class="brand" href="#main" aria-label="TP, Thomas Patout, Data Science &amp; MLOps — retour en haut">
+      <a class="brand" href="#main" aria-label="TP, Thomas Patout — retour en haut">
         <span class="brand-mark" aria-hidden="true">TP</span>
         <span class="brand-text">
           <strong>Thomas Patout</strong>
-          <span>Data Science &amp; MLOps</span>
         </span>
       </a>
 
@@ -83,7 +72,7 @@
     <section class="hero" aria-labelledby="hero-title">
       <p class="eyebrow">
         <span class="pulse-dot" aria-hidden="true"></span>
-        Assistant IA · Profil de Thomas Patout
+        Assistant IA
       </p>
       <h1 id="hero-title">
         Posez vos questions,<br>
@@ -91,7 +80,7 @@
       </h1>
       <p class="hero-subtitle">
         Un assistant qui répond à partir de mon parcours, de mes compétences et de mes projets.
-        Pensé pour les recruteurs pressés — chaque réponse cite ses sources.
+        Pensé pour les recruteurs pressés: chaque réponse cite ses sources.
       </p>
     </section>
 
@@ -145,6 +134,11 @@
         <p id="examples-label" class="examples-label">Essayez une question :</p>
         <ul id="example-chips" class="chip-list">
           <li>
+            <button class="chip" type="button" data-question="Quel est ce projet RAG ?">
+              Ce projet RAG
+            </button>
+          </li>
+          <li>
             <button class="chip" type="button" data-question="Quelles sont les compétences de Thomas en Python ?">
               Compétences en Python
             </button>
@@ -152,11 +146,6 @@
           <li>
             <button class="chip" type="button" data-question="Quel est son projet le plus complet et qu’a-t-il déployé en production ?">
               Projet le plus abouti
-            </button>
-          </li>
-          <li>
-            <button class="chip" type="button" data-question="Est-il disponible immédiatement et mobile géographiquement ?">
-              Disponibilité &amp; mobilité
             </button>
           </li>
           <li>
@@ -212,10 +201,10 @@
       </div>
 
       <div class="skeleton" aria-hidden="true">
-        <span class="skeleton-line" style="width: 92%"></span>
-        <span class="skeleton-line" style="width: 100%"></span>
-        <span class="skeleton-line" style="width: 84%"></span>
-        <span class="skeleton-line skeleton-line--short" style="width: 58%"></span>
+        <span class="skeleton-line skeleton-line--w92"></span>
+        <span class="skeleton-line skeleton-line--w100"></span>
+        <span class="skeleton-line skeleton-line--w84"></span>
+        <span class="skeleton-line skeleton-line--short skeleton-line--w58"></span>
       </div>
     </section>
 
@@ -339,7 +328,28 @@
               <path d="M7 17 17 7M9 7h8v8"></path>
             </svg>
           </a>
-          <!-- Ajoutez ici un lien mailto:votre-adresse@domaine.fr si vous préférez l'e-mail. -->
+          <span class="footer-contact">
+            <a
+              id="contact-link"
+              class="footer-link"
+              href="mailto:t.patout@proton.me"
+              title="Copier l'adresse email"
+              aria-label="Contact : copier l'adresse email t.patout@proton.me"
+            >
+              Contact
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 6.5h18v11H3z"></path>
+                <path d="m3.5 7 8.5 6 8.5-6"></path>
+              </svg>
+            </a>
+            <span id="contact-tooltip" class="copy-tooltip" role="status" aria-live="polite"></span>
+          </span>
+          <a class="footer-link" href="/confidentialite">
+            Confidentialité
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M7 17 17 7M9 7h8v8"></path>
+            </svg>
+          </a>
         </nav>
       </div>
 
