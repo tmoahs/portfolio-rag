@@ -48,6 +48,22 @@
 		}
 	}
 
+	# Documentation interactive : CSP assouplie uniquement pour ces pages
+	# (Swagger UI et ReDoc chargent leurs scripts depuis jsDelivr).
+	handle /docs* {
+		header Content-Security-Policy "default-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https://fastapi.tiangolo.com; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"
+		reverse_proxy api:8000
+	}
+
+	handle /redoc* {
+		header Content-Security-Policy "default-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https://fastapi.tiangolo.com; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"
+		reverse_proxy api:8000
+	}
+
+	handle /openapi.json {
+		reverse_proxy api:8000
+	}
+
 	# Site statique : les fichiers vivent dans /srv/static (volume monté).
 	# Les pages HTML sont servies via une réécriture vers ce dossier.
 	handle / {
@@ -72,4 +88,9 @@
 		root * /srv
 		file_server
 	}
+}
+
+# www -> domaine principal (certificat séparé, redirection permanente).
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
 }
