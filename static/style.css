@@ -1100,6 +1100,12 @@ svg {
   text-underline-offset: 0.18em;
 }
 
+.prose .link-host {
+  color: var(--text-subtle);
+  font-size: 0.86em;
+  font-weight: 400;
+}
+
 .prose code {
   padding: 0.08em 0.35em;
   border: 1px solid var(--border);

@@ -126,6 +126,15 @@
   /* Effacement rapide de la question                                       */
   /* ---------------------------------------------------------------------- */
   const clearInputBtn = document.getElementById("clear-input");
+  let clearOnNextBackspace = false;
+
+  const clearQuestion = () => {
+    if (!input) return;
+    clearOnNextBackspace = false;
+    input.value = "";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.focus();
+  };
 
   const updateClearButton = () => {
     if (!input || !clearInputBtn) return;
@@ -133,15 +142,62 @@
   };
 
   if (input) {
-    input.addEventListener("input", updateClearButton);
+    input.addEventListener("input", () => {
+      // Toute modification réelle désarme l'effacement global. Notre propre
+      // effacement remet le drapeau à false avant de déclencher cet événement.
+      clearOnNextBackspace = false;
+      updateClearButton();
+    });
+
+    input.addEventListener("keydown", (event) => {
+      if (event.isComposing) return;
+
+      if (event.key === "Backspace" && clearOnNextBackspace) {
+        // On n'efface tout que si le curseur est à la fin et sans sélection :
+        // un clic au milieu du texte garde l'édition précise.
+        const caretAtEnd =
+          input.selectionStart === input.selectionEnd &&
+          input.selectionStart === input.value.length;
+
+        if (caretAtEnd && !event.ctrlKey && !event.metaKey && !event.altKey) {
+          event.preventDefault();
+          clearQuestion();
+          return;
+        }
+
+        clearOnNextBackspace = false;
+        return;
+      }
+
+      if (
+        ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"].includes(
+          event.key
+        )
+      ) {
+        clearOnNextBackspace = false;
+      }
+    });
+
+    // Clavier virtuel mobile : `keydown` peut être « Unidentified ».
+    input.addEventListener("beforeinput", (event) => {
+      if (event.isComposing) return;
+      if (event.inputType !== "deleteContentBackward" || !clearOnNextBackspace) return;
+
+      const caretAtEnd =
+        input.selectionStart === input.selectionEnd &&
+        input.selectionStart === input.value.length;
+
+      if (caretAtEnd) {
+        event.preventDefault();
+        clearQuestion();
+      } else {
+        clearOnNextBackspace = false;
+      }
+    });
   }
 
   if (input && clearInputBtn) {
-    clearInputBtn.addEventListener("click", () => {
-      input.value = "";
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-      input.focus();
-    });
+    clearInputBtn.addEventListener("click", clearQuestion);
   }
 
   updateClearButton();
@@ -273,6 +329,10 @@
 
   const SAFE_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
 
+  // Mode strict : seuls ces domaines (et leurs sous-domaines) sont cliquables.
+  const ALLOWED_LINK_HOSTS = ["linkedin.com", "github.com", "tpatout.fr"];
+  const ALLOWED_MAILTO = "t.patout@proton.me";
+
   const safeUrl = (value) => {
     try {
       const url = new URL(value, window.location.origin);
@@ -282,25 +342,98 @@
     }
   };
 
-  const appendLink = (parent, label, href) => {
+  const isAllowedUrl = (url) => {
+    if (url.startsWith("mailto:")) {
+      // Pas de paramètres (sujet/corps préremplis) : adresse exacte uniquement.
+      const parts = url.slice("mailto:".length).split("?");
+      return parts.length === 1 && parts[0].trim().toLowerCase() === ALLOWED_MAILTO;
+    }
+    try {
+      const host = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+      return ALLOWED_LINK_HOSTS.some(
+        (base) => host === base || host.endsWith(`.${base}`)
+      );
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const appendLink = (parent, label, href, showHost = false) => {
     const url = safeUrl(href);
     if (!url) {
       parent.appendChild(document.createTextNode(label));
       return;
     }
+
+    if (!isAllowedUrl(url)) {
+      // Lien hors liste blanche : on affiche le libellé et le domaine, sans lien.
+      parent.appendChild(document.createTextNode(label));
+      if (showHost && !url.startsWith("mailto:")) {
+        try {
+          const host = new URL(url).hostname.replace(/^www\./, "");
+          if (host && !label.toLowerCase().includes(host)) {
+            const hint = document.createElement("span");
+            hint.className = "link-host";
+            hint.textContent = ` (${host})`;
+            parent.appendChild(hint);
+          }
+        } catch (_) {
+          /* URL déjà validée */
+        }
+      }
+      return;
+    }
+
     const link = document.createElement("a");
     link.textContent = label;
     link.href = url;
-    link.target = "_blank";
+    link.title = url;
+    if (!url.startsWith("mailto:")) {
+      link.target = "_blank";
+    }
     link.rel = "noopener noreferrer";
     parent.appendChild(link);
+
+    // Pour un lien Markdown dont le libellé masque la destination
+    // (« [Mon projet](https://exemple.fr) »), on affiche le domaine.
+    if (showHost && !url.startsWith("mailto:")) {
+      try {
+        const host = new URL(url).hostname.replace(/^www\./, "");
+        if (host && !label.toLowerCase().includes(host)) {
+          const hint = document.createElement("span");
+          hint.className = "link-host";
+          hint.textContent = ` (${host})`;
+          parent.appendChild(hint);
+        }
+      } catch (_) {
+        /* URL déjà validée : pas de cas attendu */
+      }
+    }
   };
 
+  const LINK_TLDS = "fr|com|org|net|io|dev|ai|co|app|me|eu|ch|info|tech|xyz|cloud|site|blog";
+
   const INLINE_SOURCE =
-    "(\\*\\*[^*]+\\*\\*|`[^`\\n]+`|\\[[^\\]\\n]+\\]\\((?:https?:\\/\\/|mailto:)[^)\\s]+\\)|https?:\\/\\/[^\\s<]+|\\*[^*\\n]+\\*)";
+    "(\\*\\*[^*]+\\*\\*|`[^`\\n]+`|\\[[^\\]\\n]+\\]\\((?:https?:\\/\\/|mailto:)[^)\\s]+\\)|https?:\\/\\/[^\\s<]+|[\\w.+-]+@[\\w-]+\\.[a-z]{2,}|(?:www\\.)?(?:[a-z0-9-]+\\.)+(?:" +
+    LINK_TLDS +
+    ")(?:\\/[^\\s<]*)?|\\*[^*\\n]+\\*)";
+
+  const trimTrailing = (value) => {
+    let url = value;
+    let trailing = "";
+    while (/[.,;:!?]$/.test(url)) {
+      trailing = url.slice(-1) + trailing;
+      url = url.slice(0, -1);
+    }
+    if (url.endsWith(")") && !url.includes("(")) {
+      trailing = ")" + trailing;
+      url = url.slice(0, -1);
+    }
+    return [url, trailing];
+  };
 
   const appendInline = (parent, text) => {
-    const pattern = new RegExp(INLINE_SOURCE, "g");
+    const pattern = new RegExp(INLINE_SOURCE, "gi");
     let lastIndex = 0;
     let match;
 
@@ -321,25 +454,23 @@
         parent.appendChild(code);
       } else if (token.startsWith("[")) {
         const link = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(token);
-        if (link) appendLink(parent, link[1], link[2]);
+        if (link) appendLink(parent, link[1], link[2], true);
         else parent.appendChild(document.createTextNode(token));
-      } else if (token.startsWith("http")) {
-        let url = token;
-        let trailing = "";
-        while (/[.,;:!?]$/.test(url)) {
-          trailing = url.slice(-1) + trailing;
-          url = url.slice(0, -1);
-        }
-        if (url.endsWith(")") && !url.includes("(")) {
-          trailing = ")" + trailing;
-          url = url.slice(0, -1);
-        }
+      } else if (/^https?:\/\//i.test(token)) {
+        const [url, trailing] = trimTrailing(token);
         appendLink(parent, url, url);
         if (trailing) parent.appendChild(document.createTextNode(trailing));
-      } else {
+      } else if (token.includes("@")) {
+        appendLink(parent, token, `mailto:${token}`);
+      } else if (token.startsWith("*")) {
         const em = document.createElement("em");
         em.textContent = token.slice(1, -1);
         parent.appendChild(em);
+      } else {
+        // Domaine sans schéma : linkedin.com/in/..., github.com/tmoahs, tpatout.fr
+        const [domain, trailing] = trimTrailing(token);
+        appendLink(parent, domain, `https://${domain}`);
+        if (trailing) parent.appendChild(document.createTextNode(trailing));
       }
 
       lastIndex = pattern.lastIndex;
@@ -756,6 +887,9 @@
         : 500;
 
       if (!question || question.length > maxLength) return;
+
+      // La question vient d'être posée : un seul Backspace effacera tout.
+      clearOnNextBackspace = true;
 
       resetResult();
       setBusy(true);

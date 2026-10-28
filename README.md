@@ -164,8 +164,10 @@ pipeline.
 
 - réponse **en streaming** (le texte s'affiche au fil de la génération, avec curseur de frappe) ;
 - réponses en **Markdown léger** (gras, italique, code, listes, titres, liens
-  cliquables) rendues **sans `innerHTML`**, avec liste blanche d'URLs ;
-- **effacement rapide** de la question en un clic (sans gêner l'édition précise) ;
+  cliquables) rendues **sans `innerHTML`**, avec **liste blanche de domaines**
+  (LinkedIn, GitHub, tpatout.fr) ;
+- **effacement rapide** : un seul `Retour arrière` après avoir posé la question, ou un
+  clic sur × ; l'édition précise reste normale avant l'envoi ;
 - **sources dépliables** : titre, fichier et texte exact du chunk utilisé ;
 - pilules de questions qui **envoient directement** la question ;
 - **contact en un clic** : l'adresse email est copiée dans le presse-papiers avec
@@ -375,6 +377,9 @@ Points clés :
 - Les questions et extraits sont traités par l'**API Google Gemini** : c'est documenté
   dans la page [`/confidentialite`](static/confidentialite.html).
 - Messages d'erreur génériques côté client, détails uniquement dans les logs serveur.
+- Les liens sortants des réponses sont limités à une **liste blanche** (`linkedin.com`,
+  `github.com`, `tpatout.fr`) et à l'adresse de contact ; tout autre lien s'affiche en
+  texte, avec son domaine visible.
 
 ### Vérifications effectuées (répétition derrière le proxy)
 
