@@ -123,6 +123,30 @@
   }
 
   /* ---------------------------------------------------------------------- */
+  /* Effacement rapide de la question                                       */
+  /* ---------------------------------------------------------------------- */
+  const clearInputBtn = document.getElementById("clear-input");
+
+  const updateClearButton = () => {
+    if (!input || !clearInputBtn) return;
+    clearInputBtn.hidden = input.value.length === 0;
+  };
+
+  if (input) {
+    input.addEventListener("input", updateClearButton);
+  }
+
+  if (input && clearInputBtn) {
+    clearInputBtn.addEventListener("click", () => {
+      input.value = "";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.focus();
+    });
+  }
+
+  updateClearButton();
+
+  /* ---------------------------------------------------------------------- */
   /* Pilules d'exemples                                                     */
   /* ---------------------------------------------------------------------- */
   const exampleChips = document.querySelectorAll("#example-chips [data-question]");
@@ -245,17 +269,180 @@
   };
 
   // Écrit le texte de la réponse (texte brut : pas d'innerHTML, donc pas de XSS).
+  /* --- Rendu Markdown léger (sans innerHTML) ----------------------------- */
+
+  const SAFE_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
+
+  const safeUrl = (value) => {
+    try {
+      const url = new URL(value, window.location.origin);
+      return SAFE_PROTOCOLS.has(url.protocol) ? url.href : null;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const appendLink = (parent, label, href) => {
+    const url = safeUrl(href);
+    if (!url) {
+      parent.appendChild(document.createTextNode(label));
+      return;
+    }
+    const link = document.createElement("a");
+    link.textContent = label;
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    parent.appendChild(link);
+  };
+
+  const INLINE_SOURCE =
+    "(\\*\\*[^*]+\\*\\*|`[^`\\n]+`|\\[[^\\]\\n]+\\]\\((?:https?:\\/\\/|mailto:)[^)\\s]+\\)|https?:\\/\\/[^\\s<]+|\\*[^*\\n]+\\*)";
+
+  const appendInline = (parent, text) => {
+    const pattern = new RegExp(INLINE_SOURCE, "g");
+    let lastIndex = 0;
+    let match;
+
+    while ((match = pattern.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        parent.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+      }
+
+      const token = match[0];
+
+      if (token.startsWith("**")) {
+        const strong = document.createElement("strong");
+        appendInline(strong, token.slice(2, -2));
+        parent.appendChild(strong);
+      } else if (token.startsWith("`")) {
+        const code = document.createElement("code");
+        code.textContent = token.slice(1, -1);
+        parent.appendChild(code);
+      } else if (token.startsWith("[")) {
+        const link = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(token);
+        if (link) appendLink(parent, link[1], link[2]);
+        else parent.appendChild(document.createTextNode(token));
+      } else if (token.startsWith("http")) {
+        let url = token;
+        let trailing = "";
+        while (/[.,;:!?]$/.test(url)) {
+          trailing = url.slice(-1) + trailing;
+          url = url.slice(0, -1);
+        }
+        if (url.endsWith(")") && !url.includes("(")) {
+          trailing = ")" + trailing;
+          url = url.slice(0, -1);
+        }
+        appendLink(parent, url, url);
+        if (trailing) parent.appendChild(document.createTextNode(trailing));
+      } else {
+        const em = document.createElement("em");
+        em.textContent = token.slice(1, -1);
+        parent.appendChild(em);
+      }
+
+      lastIndex = pattern.lastIndex;
+    }
+
+    if (lastIndex < text.length) {
+      parent.appendChild(document.createTextNode(text.slice(lastIndex)));
+    }
+  };
+
+  const renderRichText = (container, text) => {
+    const lines = String(text || "").split(/\r?\n/);
+    let paragraphLines = [];
+    let currentList = null;
+    let currentListType = null;
+
+    const closeList = () => {
+      currentList = null;
+      currentListType = null;
+    };
+
+    const flushParagraph = () => {
+      if (!paragraphLines.length) return;
+      const paragraph = document.createElement("p");
+      appendInline(paragraph, paragraphLines.join("\n"));
+      container.appendChild(paragraph);
+      paragraphLines = [];
+    };
+
+    const openList = (type) => {
+      if (currentList && currentListType === type) return currentList;
+      closeList();
+      currentList = document.createElement(type === "ol" ? "ol" : "ul");
+      currentListType = type;
+      container.appendChild(currentList);
+      return currentList;
+    };
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+
+      if (!trimmed) {
+        flushParagraph();
+        closeList();
+        continue;
+      }
+
+      const heading = /^(#{1,6})\s+(.*)$/.exec(trimmed);
+      if (heading) {
+        flushParagraph();
+        closeList();
+        const title = document.createElement("h3");
+        appendInline(title, heading[2]);
+        container.appendChild(title);
+        continue;
+      }
+
+      const bullet = /^[-*•]\s+(.*)$/.exec(trimmed);
+      if (bullet) {
+        flushParagraph();
+        const list = openList("ul");
+        const item = document.createElement("li");
+        appendInline(item, bullet[1]);
+        list.appendChild(item);
+        continue;
+      }
+
+      const ordered = /^\d+[.)]\s+(.*)$/.exec(trimmed);
+      if (ordered) {
+        flushParagraph();
+        const list = openList("ol");
+        const item = document.createElement("li");
+        appendInline(item, ordered[1]);
+        list.appendChild(item);
+        continue;
+      }
+
+      closeList();
+      paragraphLines.push(trimmed);
+    }
+
+    flushParagraph();
+    closeList();
+  };
+
+  const appendStreamCaret = (container) => {
+    const caret = document.createElement("span");
+    caret.className = "stream-caret";
+    caret.setAttribute("aria-hidden", "true");
+
+    let target = container.lastElementChild;
+    if (target && (target.tagName === "UL" || target.tagName === "OL")) {
+      target = target.lastElementChild || target;
+    }
+    (target || container).appendChild(caret);
+  };
+
   const renderAnswer = (text, streaming) => {
     if (!answerBody) return;
 
-    let target = answerBody.querySelector(".stream-text");
-    if (!target) {
-      target = document.createElement("p");
-      target.className = "stream-text";
-      answerBody.replaceChildren(target);
-    }
-
-    target.textContent = text;
+    answerBody.replaceChildren();
+    renderRichText(answerBody, text);
+    if (streaming) appendStreamCaret(answerBody);
     if (answerSection) answerSection.classList.toggle("is-streaming", Boolean(streaming));
   };
 

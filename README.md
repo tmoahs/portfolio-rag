@@ -163,6 +163,9 @@ pipeline.
 **Côté utilisateur**
 
 - réponse **en streaming** (le texte s'affiche au fil de la génération, avec curseur de frappe) ;
+- réponses en **Markdown léger** (gras, italique, code, listes, titres, liens
+  cliquables) rendues **sans `innerHTML`**, avec liste blanche d'URLs ;
+- **effacement rapide** de la question en un clic (sans gêner l'édition précise) ;
 - **sources dépliables** : titre, fichier et texte exact du chunk utilisé ;
 - pilules de questions qui **envoient directement** la question ;
 - **contact en un clic** : l'adresse email est copiée dans le presse-papiers avec
